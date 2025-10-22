@@ -23,22 +23,26 @@ const Auth = () => {
     // Check for password recovery hash in URL
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const type = hashParams.get('type');
+    const isRecoveryMode = type === 'recovery';
     
-    if (type === 'recovery') {
+    if (isRecoveryMode) {
       setIsResettingPassword(true);
       setIsForgotPassword(false);
       setIsLogin(false);
-      return;
+      // Clean up URL hash
+      window.history.replaceState(null, '', window.location.pathname);
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
+    // Set up auth state listener first
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session && !isRecoveryMode) {
         navigate("/");
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
+    // Then check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session && !isRecoveryMode) {
         navigate("/");
       }
     });
