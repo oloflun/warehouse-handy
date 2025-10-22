@@ -11,6 +11,7 @@ import { Package } from "lucide-react";
 const Auth = () => {
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -36,7 +37,14 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      if (isLogin) {
+      if (isForgotPassword) {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/auth`,
+        });
+        if (error) throw error;
+        toast.success("Återställningslänk skickad till din e-post!");
+        setIsForgotPassword(false);
+      } else if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -70,7 +78,11 @@ const Auth = () => {
           </div>
           <CardTitle className="text-2xl font-bold">WMS</CardTitle>
           <CardDescription>
-            {isLogin ? "Logga in på ditt konto" : "Skapa ett nytt konto"}
+            {isForgotPassword 
+              ? "Återställ ditt lösenord" 
+              : isLogin 
+                ? "Logga in på ditt konto" 
+                : "Skapa ett nytt konto"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -86,28 +98,48 @@ const Auth = () => {
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Lösenord</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
+            {!isForgotPassword && (
+              <div className="space-y-2">
+                <Label htmlFor="password">Lösenord</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Laddar..." : isLogin ? "Logga in" : "Skapa konto"}
+              {loading 
+                ? "Laddar..." 
+                : isForgotPassword 
+                  ? "Skicka återställningslänk" 
+                  : isLogin 
+                    ? "Logga in" 
+                    : "Skapa konto"}
             </Button>
           </form>
-          <div className="mt-4 text-center text-sm">
+          <div className="mt-4 text-center text-sm space-y-2">
+            {!isForgotPassword && (
+              <button
+                type="button"
+                onClick={() => setIsLogin(!isLogin)}
+                className="text-primary hover:underline block w-full"
+              >
+                {isLogin ? "Inget konto? Skapa ett här" : "Har redan ett konto? Logga in"}
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-primary hover:underline"
+              onClick={() => {
+                setIsForgotPassword(!isForgotPassword);
+                setIsLogin(true);
+              }}
+              className="text-primary hover:underline block w-full"
             >
-              {isLogin ? "Inget konto? Skapa ett här" : "Har redan ett konto? Logga in"}
+              {isForgotPassword ? "Tillbaka till inloggning" : "Glömt lösenord?"}
             </button>
           </div>
         </CardContent>
