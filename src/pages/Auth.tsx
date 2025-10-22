@@ -48,24 +48,37 @@ const Auth = () => {
 
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (newPassword !== confirmPassword) {
+      toast.error("Lösenorden matchar inte");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast.error("Lösenordet måste vara minst 6 tecken");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      if (newPassword !== confirmPassword) {
-        toast.error("Lösenorden matchar inte");
-        return;
-      }
-
-      if (newPassword.length < 6) {
-        toast.error("Lösenordet måste vara minst 6 tecken");
-        return;
-      }
-
       const { error } = await supabase.auth.updateUser({ 
         password: newPassword 
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Password reset error:", error);
+        
+        // Check if it's a token expiration or invalid token error
+        if (error.message.includes("Invalid") || error.message.includes("expired")) {
+          toast.error("Återställningslänken har gått ut. Begär en ny länk.");
+          setIsResettingPassword(false);
+          setIsForgotPassword(true);
+          return;
+        }
+        
+        throw error;
+      }
       
       toast.success("Lösenord uppdaterat! Du är nu inloggad.");
       navigate("/");
