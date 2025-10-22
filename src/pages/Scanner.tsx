@@ -203,6 +203,20 @@ const Scanner = () => {
                 <span className="text-muted-foreground">Kategori:</span>
                 <p className="font-medium">{product.category || "—"}</p>
               </div>
+              {product.fdt_sellus_article_id && (
+                <>
+                  <div>
+                    <span className="text-muted-foreground">FDT Article ID:</span>
+                    <p className="font-medium">{product.fdt_sellus_article_id}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Synk-status:</span>
+                    <p className="font-medium text-green-600">
+                      {product.fdt_sync_status === 'synced' ? '✓ Synkad' : 'Väntande'}
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="space-y-2">

@@ -179,14 +179,26 @@ const Index = () => {
         </Card>
       </div>
 
-      <Button
-        onClick={() => navigate("/scanner")}
-        size="lg"
-        className="w-full h-16 text-lg"
-      >
-        <Scan className="w-6 h-6 mr-2" />
-        Starta Scanner
-      </Button>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Button
+          onClick={() => navigate("/scanner")}
+          size="lg"
+          className="h-16 text-lg"
+        >
+          <Scan className="w-6 h-6 mr-2" />
+          Starta Scanner
+        </Button>
+        
+        <Button
+          onClick={() => navigate("/integrations")}
+          size="lg"
+          variant="outline"
+          className="h-16 text-lg"
+        >
+          <Package className="w-6 h-6 mr-2" />
+          FDT Integration
+        </Button>
+      </div>
 
       <Card>
         <CardHeader>
