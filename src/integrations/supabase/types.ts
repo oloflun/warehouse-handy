@@ -14,6 +14,89 @@ export type Database = {
   }
   public: {
     Tables: {
+      fdt_sync_log: {
+        Row: {
+          created_at: string | null
+          direction: string
+          duration_ms: number | null
+          error_message: string | null
+          fdt_article_id: string | null
+          id: string
+          request_payload: Json | null
+          response_payload: Json | null
+          status: string
+          sync_type: string
+          wms_product_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          direction: string
+          duration_ms?: number | null
+          error_message?: string | null
+          fdt_article_id?: string | null
+          id?: string
+          request_payload?: Json | null
+          response_payload?: Json | null
+          status: string
+          sync_type: string
+          wms_product_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          direction?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          fdt_article_id?: string | null
+          id?: string
+          request_payload?: Json | null
+          response_payload?: Json | null
+          status?: string
+          sync_type?: string
+          wms_product_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fdt_sync_log_wms_product_id_fkey"
+            columns: ["wms_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fdt_sync_status: {
+        Row: {
+          id: string
+          is_enabled: boolean | null
+          last_error: string | null
+          last_successful_sync: string | null
+          sync_type: string
+          total_errors: number | null
+          total_synced: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          is_enabled?: boolean | null
+          last_error?: string | null
+          last_successful_sync?: string | null
+          sync_type: string
+          total_errors?: number | null
+          total_synced?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          is_enabled?: boolean | null
+          last_error?: string | null
+          last_successful_sync?: string | null
+          sync_type?: string
+          total_errors?: number | null
+          total_synced?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       inventory: {
         Row: {
           id: string
@@ -80,6 +163,9 @@ export type Database = {
           category: string | null
           created_at: string | null
           description: string | null
+          fdt_last_synced: string | null
+          fdt_sellus_article_id: string | null
+          fdt_sync_status: string | null
           id: string
           min_stock: number | null
           name: string
@@ -91,6 +177,9 @@ export type Database = {
           category?: string | null
           created_at?: string | null
           description?: string | null
+          fdt_last_synced?: string | null
+          fdt_sellus_article_id?: string | null
+          fdt_sync_status?: string | null
           id?: string
           min_stock?: number | null
           name: string
@@ -102,6 +191,9 @@ export type Database = {
           category?: string | null
           created_at?: string | null
           description?: string | null
+          fdt_last_synced?: string | null
+          fdt_sellus_article_id?: string | null
+          fdt_sync_status?: string | null
           id?: string
           min_stock?: number | null
           name?: string
