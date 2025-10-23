@@ -167,29 +167,33 @@ Deno.serve(async (req) => {
             // Log full order line object to understand FDT's exact field structure
             console.log('📋 Full FDT order line object:', JSON.stringify(line, null, 2));
             
-            // Handle multiple possible field name variations and cast to string
-            const articleIdRaw = line.articleId || line.itemId || line.item_id || line.productId || 
-                                 line.articleNumber || line.itemNumber || line.sku;
-            const articleId = articleIdRaw != null ? String(articleIdRaw) : null;
+            // Use itemNumber (article number like "1201") instead of itemId (internal ID like "297091")
+            const articleNumber = line.itemNumber || line.articleNumber || line.sku || null;
+            const internalId = line.itemId || line.item_id || line.productId || null;
             const quantity = line.quantity || line.qty || line.amount || 1;
             
-            if (!articleId) {
-              console.warn(`⚠️ Skipping order line without article ID in order ${orderId}`);
+            // Prefer article number over internal ID
+            const fdtArticleId = articleNumber || String(internalId);
+            
+            if (!fdtArticleId) {
+              console.warn(`⚠️ Skipping order line without article info in order ${orderId}`);
               console.warn(`📋 Line object keys: ${Object.keys(line).join(', ')}`);
               continue;
             }
 
-            // Try to find product by fdt_sellus_article_id OR barcode
+            // Try to find product by article number or FDT article ID
             const { data: product } = await supabaseClient
               .from('products')
-              .select('id')
-              .or(`fdt_sellus_article_id.eq.${articleId},barcode.eq.${articleId}`)
+              .select('id, name')
+              .or(`fdt_sellus_article_id.eq.${fdtArticleId},barcode.eq.${fdtArticleId}`)
               .maybeSingle();
 
             const productId = product?.id || null;
 
             if (!productId) {
-              console.log(`ℹ️ Product not yet synced for article ID: ${articleId} - creating order line anyway`);
+              console.log(`ℹ️ Product not found for article: ${fdtArticleId} - creating order line anyway`);
+            } else {
+              console.log(`✅ Matched product: ${product?.name} for article: ${fdtArticleId}`);
             }
 
             // Check if order line already exists
@@ -197,7 +201,7 @@ Deno.serve(async (req) => {
               .from('order_lines')
               .select('id')
               .eq('order_id', dbOrder.id)
-              .eq('fdt_article_id', articleId)
+              .eq('fdt_article_id', fdtArticleId)
               .maybeSingle();
               
             if (!existingLine) {
@@ -206,12 +210,12 @@ Deno.serve(async (req) => {
                 .insert({
                   order_id: dbOrder.id,
                   product_id: productId,
-                  fdt_article_id: articleId,
+                  fdt_article_id: fdtArticleId,
                   quantity_ordered: quantity,
                   quantity_picked: 0,
                   is_picked: false
                 });
-              console.log(`➕ Created order line for article ${articleId} (product_id: ${productId || 'pending'})`);
+              console.log(`➕ Created order line for article ${fdtArticleId} (product_id: ${productId || 'pending'})`);
             }
 
             // Only create transaction if product exists (can't update inventory without product)
@@ -229,7 +233,7 @@ Deno.serve(async (req) => {
             await logSync(supabaseClient, {
               sync_type: 'sale',
               direction: 'sellus_to_wms',
-              fdt_article_id: articleId,
+              fdt_article_id: fdtArticleId,
               wms_product_id: productId,
               status: 'success',
               response_payload: line,

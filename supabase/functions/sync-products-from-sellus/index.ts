@@ -19,10 +19,35 @@ Deno.serve(async (req) => {
 
     console.log('🔄 Starting product sync from FDT Sellus...');
 
-    // Try /items first, fallback to /items/full if needed
-    // Filter for Elon branch only (branchId=5)
+    // Step 1: Fetch product groups and find "1200- Elon"
+    console.log('📋 Fetching product groups...');
+    const groupsResult = await callFDTApi({
+      endpoint: '/productgroups',
+      method: 'GET',
+    });
+
+    if (!groupsResult.success) {
+      throw new Error('Failed to fetch product groups: ' + groupsResult.error);
+    }
+
+    const productGroups = groupsResult.data?.results || groupsResult.data || [];
+    console.log(`📋 Found ${productGroups.length} product groups`);
+    
+    const elonGroup = productGroups.find(
+      (g: any) => g.name?.includes('1200') || g.name?.includes('Elon') || g.code === '1200'
+    );
+
+    if (!elonGroup) {
+      throw new Error('❌ Varugrupp "1200- Elon" hittades inte i FDT API');
+    }
+
+    console.log(`✅ Found Elon product group: ${JSON.stringify(elonGroup)}`);
+    const elonGroupId = elonGroup.id || elonGroup.productGroupId;
+
+    // Step 2: Fetch products filtered by product group
+    console.log(`🌐 Fetching items from productGroupId=${elonGroupId}`);
     let result = await callFDTApi({
-      endpoint: '/items?branchId=5',
+      endpoint: `/items?branchId=5&productGroupId=${elonGroupId}`,
       method: 'GET',
     });
 
@@ -64,10 +89,11 @@ Deno.serve(async (req) => {
       console.log('⚠️ No products found from FDT API - check API endpoint or branchId');
     }
     
-    console.log(`📦 Total ${articles.length} products to sync`);
-    
+    console.log(`📦 Total ${articles.length} products to sync from varugrupp 1200- Elon`);
+
     let syncedCount = 0;
     let errorCount = 0;
+    const syncedArticleIds: string[] = [];
 
     for (const article of articles) {
       try {
@@ -172,6 +198,7 @@ Deno.serve(async (req) => {
         });
 
         syncedCount++;
+        syncedArticleIds.push(articleId);
       } catch (error) {
         console.error(`❌ Error syncing product:`, error);
         console.error('📦 Product data:', article);
@@ -203,12 +230,60 @@ Deno.serve(async (req) => {
 
     console.log(`✅ Product sync completed: ${syncedCount} synced, ${errorCount} errors`);
 
+    // Step 3: Clean up products not in "1200- Elon" group
+    console.log('🧹 Cleaning up products outside varugrupp 1200...');
+    let deletedCount = 0;
+    let inactivatedCount = 0;
+
+    if (syncedArticleIds.length > 0) {
+      const { data: productsToRemove } = await supabaseClient
+        .from('products')
+        .select('id, name, fdt_sellus_article_id, barcode')
+        .not('fdt_sellus_article_id', 'in', `(${syncedArticleIds.join(',')})`);
+
+      if (productsToRemove && productsToRemove.length > 0) {
+        console.log(`🧹 Found ${productsToRemove.length} products outside varugrupp 1200`);
+
+        for (const product of productsToRemove) {
+          // Check if product has inventory or order lines
+          const [invCheck, orderCheck] = await Promise.all([
+            supabaseClient.from('inventory').select('id').eq('product_id', product.id).maybeSingle(),
+            supabaseClient.from('order_lines').select('id').eq('product_id', product.id).maybeSingle(),
+          ]);
+
+          if (invCheck.data || orderCheck.data) {
+            // Product is in use - mark as inactive
+            await supabaseClient
+              .from('products')
+              .update({ fdt_sync_status: 'inactive' })
+              .eq('id', product.id);
+
+            inactivatedCount++;
+            console.log(`⚠️ Inactivated: ${product.barcode || product.name} (in use)`);
+          } else {
+            // Product not in use - delete
+            await supabaseClient
+              .from('products')
+              .delete()
+              .eq('id', product.id);
+
+            deletedCount++;
+            console.log(`🗑️ Deleted: ${product.barcode || product.name}`);
+          }
+        }
+
+        console.log(`✅ Cleanup done: ${deletedCount} deleted, ${inactivatedCount} inactivated`);
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         synced: syncedCount,
         errors: errorCount,
-        message: `Synced ${syncedCount} products from FDT Sellus`,
+        deleted: deletedCount,
+        inactivated: inactivatedCount,
+        message: `Synced ${syncedCount} products from varugrupp 1200- Elon`,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

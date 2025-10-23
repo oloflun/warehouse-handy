@@ -37,6 +37,7 @@ const ArticlesPage = () => {
       const { data, error } = await supabase
         .from('products')
         .select('*')
+        .neq('fdt_sync_status', 'inactive')
         .order('name');
 
       if (error) throw error;
@@ -76,9 +77,12 @@ const ArticlesPage = () => {
 
       if (error) throw error;
 
+      const deleted = data?.deleted || 0;
+      const inactivated = data?.inactivated || 0;
+      
       toast({
         title: "Synkronisering slutförd",
-        description: `Synkroniserade ${data?.synced || 0} artiklar`,
+        description: `Synkade ${data?.synced || 0} artiklar från varugrupp 1200- Elon${deleted + inactivated > 0 ? `, ${deleted} raderade, ${inactivated} inaktiverade` : ''}`,
       });
 
       await fetchArticles();
@@ -119,7 +123,7 @@ const ArticlesPage = () => {
               <List className="h-8 w-8" />
               Artiklar
             </h1>
-            <p className="text-muted-foreground">Alla registrerade artiklar i systemet</p>
+            <p className="text-muted-foreground">Artiklar från varugrupp 1200- Elon</p>
           </div>
         </div>
         <div className="flex gap-2">
