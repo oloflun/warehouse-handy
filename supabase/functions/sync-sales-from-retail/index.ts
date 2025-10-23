@@ -30,7 +30,14 @@ Deno.serve(async (req) => {
       throw new Error(result.error);
     }
 
-    const orders = Array.isArray(result.data) ? result.data : (result.data.orders || []);
+    // Robust parsing of orders array
+    const payload = result.data || {};
+    const orders = Array.isArray(payload)
+      ? payload
+      : payload.results || payload.orders || payload.data || [];
+    
+    console.log('🔍 FDT payload keys:', Object.keys(payload));
+    console.log('🔍 First item sample:', Array.isArray(orders) && orders[0] ? JSON.stringify(orders[0]).substring(0, 200) : 'none');
     console.log(`📦 Found ${orders.length} orders to process`);
     
     // Simplified status filtering - exclude only non-paid orders
@@ -59,7 +66,7 @@ Deno.serve(async (req) => {
         const orderDate = order.date || order.orderDate || order.createdAt || order.created_at || new Date().toISOString();
         const storeName = order.storeName || order.store || order.location || 'Butik';
         const customerName = order.customerName || order.customer || '';
-        const customerNotes = order.notes || order.customerNotes || order.comment || '';
+        const customerNotes = order.notes || order.note || order.customerNotes || order.comment || '';
         
         // Find or create location
         let { data: location } = await supabaseClient
@@ -133,9 +140,24 @@ Deno.serve(async (req) => {
         }
         
         // Handle orders with multiple line items
-        const orderLines = order.lines || order.items || order.details || order.orderLines;
+        let orderLines = order.lines || order.items || order.details || order.orderLines;
         
-        if (orderLines && Array.isArray(orderLines)) {
+        // If no lines found in list response, fetch order details
+        if (!orderLines || !Array.isArray(orderLines) || orderLines.length === 0) {
+          console.log(`🔄 No lines in order ${orderId}, fetching details...`);
+          const detailsResult = await callFDTApi({
+            endpoint: `/orders/${orderId}`,
+            method: 'GET',
+          });
+          
+          if (detailsResult.success && detailsResult.data) {
+            const details = detailsResult.data || {};
+            orderLines = details.lines || details.items || details.orderLines || details.details || [];
+            console.log(`✅ Fetched ${Array.isArray(orderLines) ? orderLines.length : 0} lines from order details`);
+          }
+        }
+        
+        if (orderLines && Array.isArray(orderLines) && orderLines.length > 0) {
           console.log(`📋 Order ${orderId} has ${orderLines.length} line items`);
           
           for (const line of orderLines) {
