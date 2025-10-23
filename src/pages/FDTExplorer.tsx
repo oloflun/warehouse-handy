@@ -33,12 +33,12 @@ interface HistoryItem {
 }
 
 const PREDEFINED_ENDPOINTS = [
-  { value: "items", label: "Alla produkter (/items)" },
-  { value: "items/full", label: "Fullständig produktdata (/items/full)" },
+  { value: "items", label: "Produkter med lagersaldo (/items)" },
+  { value: "items/full", label: "Fullständig produktdata inkl. lager (/items/full)" },
   { value: "orders", label: "Ordrar (/orders)" },
-  { value: "inventory", label: "Lagerstatus (/inventory)" },
   { value: "customers", label: "Kunder (/customers)" },
-  { value: "warehouses", label: "Lager/platser (/warehouses)" },
+  { value: "branches", label: "Butiker/Lager (/branches)" },
+  { value: "suppliers", label: "Leverantörer (/suppliers)" },
   { value: "custom", label: "Anpassad endpoint..." },
 ];
 
