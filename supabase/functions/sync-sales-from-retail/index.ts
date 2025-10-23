@@ -25,10 +25,10 @@ Deno.serve(async (req) => {
 
     const since = syncStatus?.last_successful_sync || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-    console.log(`🔄 Fetching sales since ${since}...`);
+    console.log(`🔄 Fetching orders since ${since}...`);
 
     const result = await callFDTApi({
-      endpoint: `/sales?since=${encodeURIComponent(since)}`,
+      endpoint: `/orders?since=${encodeURIComponent(since)}`,
       method: 'GET',
     });
 
@@ -36,33 +36,40 @@ Deno.serve(async (req) => {
       throw new Error(result.error);
     }
 
-    const sales = Array.isArray(result.data) ? result.data : (result.data.sales || []);
+    const orders = Array.isArray(result.data) ? result.data : (result.data.orders || []);
     let syncedCount = 0;
     let errorCount = 0;
 
-    for (const sale of sales) {
+    for (const order of orders) {
       try {
+        // Map order details - adjust field names based on actual FDT API response
+        const articleId = order.articleId || order.itemId || order.item_id;
+        const quantity = order.quantity || order.qty || 1;
+        const storeName = order.storeName || order.store || 'Butik';
+        const orderId = order.id || order.orderId || 'unknown';
+        const orderDate = order.date || order.orderDate || new Date().toISOString();
+
         const { data: product } = await supabaseClient
           .from('products')
           .select('id')
-          .eq('fdt_sellus_article_id', sale.articleId)
+          .eq('fdt_sellus_article_id', articleId)
           .maybeSingle();
 
         if (!product) {
-          console.warn(`Product not found for article ID: ${sale.articleId}`);
+          console.warn(`Product not found for article ID: ${articleId}`);
           continue;
         }
 
         let { data: location } = await supabaseClient
           .from('locations')
           .select('id')
-          .eq('name', sale.storeName || 'Butik')
+          .eq('name', storeName)
           .maybeSingle();
 
         if (!location) {
           const { data: newLocation, error: locError } = await supabaseClient
             .from('locations')
-            .insert({ name: sale.storeName || 'Butik' })
+            .insert({ name: storeName })
             .select()
             .single();
           
@@ -81,19 +88,19 @@ Deno.serve(async (req) => {
         await supabaseClient.from('transactions').insert({
           product_id: product.id,
           location_id: location.id,
-          quantity: sale.quantity,
+          quantity: quantity,
           type: 'out',
-          notes: `Försäljning från FDT - Order ${sale.orderId}`,
-          created_at: sale.saleDate || new Date().toISOString(),
+          notes: `Försäljning från FDT - Order ${orderId}`,
+          created_at: orderDate,
         });
 
         await logSync(supabaseClient, {
           sync_type: 'sale',
           direction: 'sellus_to_wms',
-          fdt_article_id: sale.articleId,
+          fdt_article_id: articleId,
           wms_product_id: product.id,
           status: 'success',
-          response_payload: sale,
+          response_payload: order,
           duration_ms: result.duration,
         });
 

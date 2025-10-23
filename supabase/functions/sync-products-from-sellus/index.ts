@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
     console.log('🔄 Starting product sync from FDT Sellus...');
 
     const result = await callFDTApi({
-      endpoint: '/articles',
+      endpoint: '/items/full',
       method: 'GET',
     });
 
@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
       throw new Error(result.error);
     }
 
-    const articles = Array.isArray(result.data) ? result.data : (result.data.articles || []);
+    const articles = Array.isArray(result.data) ? result.data : (result.data.items || []);
     let syncedCount = 0;
     let errorCount = 0;
 

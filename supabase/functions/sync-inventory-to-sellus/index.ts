@@ -50,14 +50,13 @@ Deno.serve(async (req) => {
           .eq('id', item.location_id)
           .maybeSingle();
 
+        // Update item using POST /items/{id} endpoint
         const result = await callFDTApi({
-          endpoint: `/inventory/${product.fdt_sellus_article_id}`,
-          method: 'PUT',
+          endpoint: `/items/${product.fdt_sellus_article_id}`,
+          method: 'POST',
           body: {
-            articleId: product.fdt_sellus_article_id,
             quantity: item.quantity,
-            location: location?.name,
-            updatedAt: new Date().toISOString(),
+            // Add other fields as needed based on FDT API requirements
           },
         });
 
