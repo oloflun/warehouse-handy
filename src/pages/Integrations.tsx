@@ -119,7 +119,7 @@ const Integrations = () => {
     const labels: Record<string, string> = {
       'product_import': 'Produkter från Sellus',
       'inventory_export': 'Lagersaldo till Sellus',
-      'sale_import': 'Försäljning (Retail + E-handel)',
+      'sale_import': 'Försäljning',
     };
     return labels[type] || type;
   };
