@@ -17,19 +17,12 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { data: syncStatus } = await supabaseClient
-      .from('fdt_sync_status')
-      .select('last_successful_sync')
-      .eq('sync_type', 'sale_import')
-      .maybeSingle();
-
-    const since = syncStatus?.last_successful_sync || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-
-    console.log(`🔄 Fetching all orders (retail + e-commerce) since ${since} for Elon branch (branchId=5)...`);
+    console.log(`🔄 Fetching all orders (retail + e-commerce) for Elon branch (branchId=5)...`);
 
     // Filter for Elon branch only (branchId=5)
+    // Note: No time filter - fetches all orders to catch long-pending orders
     const result = await callFDTApi({
-      endpoint: `/orders?since=${encodeURIComponent(since)}&branchId=5`,
+      endpoint: `/orders?branchId=5`,
       method: 'GET',
     });
 
