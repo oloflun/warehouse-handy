@@ -1,5 +1,4 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,7 +11,7 @@ interface ExplorerRequest {
   body?: any;
 }
 
-async function tryFetchWithAuth(url: string, method: string, body: any, authHeader: { [key: string]: string }) {
+async function tryFetchWithAuth(url: string, method: string, body: any, authHeader: Record<string, string>) {
   const options: RequestInit = {
     method,
     headers: {
@@ -54,23 +53,20 @@ Deno.serve(async (req) => {
     console.log(`[FDT Explorer] Full URL: ${fullUrl}`);
 
     // Try different auth strategies
-    const authStrategies = [
-      { name: 'Bearer Token', header: apiKey ? { 'Authorization': `Bearer ${apiKey}` } : null },
-      { name: 'X-API-Key', header: apiKey ? { 'X-API-Key': apiKey } : null },
+    const authStrategies: Array<{ name: string; header: Record<string, string> }> = [
+      { name: 'Bearer Token', header: apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {} },
+      { name: 'X-API-Key', header: apiKey ? { 'X-API-Key': apiKey } : {} },
       { name: 'No Auth', header: {} },
     ];
 
-    let lastError = null;
+    let lastError: any = null;
     let successResponse = null;
-    let usedStrategy = '';
 
     for (const strategy of authStrategies) {
-      if (!strategy.header && strategy.name !== 'No Auth') continue;
-
       console.log(`[FDT Explorer] Trying auth strategy: ${strategy.name}`);
 
       try {
-        const response = await tryFetchWithAuth(fullUrl, method, body, strategy.header || {});
+        const response = await tryFetchWithAuth(fullUrl, method, body, strategy.header);
         const duration = Date.now() - startTime;
         
         console.log(`[FDT Explorer] ${strategy.name} - Status: ${response.status}`);
@@ -122,7 +118,7 @@ Deno.serve(async (req) => {
       } catch (error) {
         console.error(`[FDT Explorer] ${strategy.name} failed:`, error);
         lastError = {
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
           strategy: strategy.name,
         };
       }
@@ -158,7 +154,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         duration_ms: duration,
       }),
       {
