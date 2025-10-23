@@ -179,7 +179,7 @@ const Index = () => {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Button
           onClick={() => navigate("/scanner")}
           size="lg"
@@ -197,6 +197,15 @@ const Index = () => {
         >
           <Package className="w-6 h-6 mr-2" />
           FDT Integration
+        </Button>
+
+        <Button
+          onClick={() => navigate("/fdt-explorer")}
+          size="lg"
+          variant="outline"
+          className="h-16 text-lg"
+        >
+          API Explorer
         </Button>
       </div>
 

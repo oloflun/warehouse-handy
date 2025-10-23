@@ -148,6 +148,9 @@ const Integrations = () => {
             <p className="text-muted-foreground">Hantera synkronisering med FDT Sellus & Excellence Retail</p>
           </div>
         </div>
+        <Button onClick={() => navigate('/fdt-explorer')} variant="outline">
+          API Explorer
+        </Button>
         <Button onClick={fetchData} variant="outline" size="icon">
           <RefreshCw className="h-4 w-4" />
         </Button>
