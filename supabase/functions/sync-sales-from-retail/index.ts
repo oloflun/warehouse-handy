@@ -173,11 +173,11 @@ Deno.serve(async (req) => {
               continue;
             }
 
-            // Try to find product, but proceed even if not found
+            // Try to find product by fdt_sellus_article_id OR barcode
             const { data: product } = await supabaseClient
               .from('products')
               .select('id')
-              .eq('fdt_sellus_article_id', articleId)
+              .or(`fdt_sellus_article_id.eq.${articleId},barcode.eq.${articleId}`)
               .maybeSingle();
 
             const productId = product?.id || null;
@@ -243,11 +243,11 @@ Deno.serve(async (req) => {
             continue;
           }
 
-          // Try to find product, but proceed even if not found
+          // Try to find product by fdt_sellus_article_id OR barcode
           const { data: product } = await supabaseClient
             .from('products')
             .select('id')
-            .eq('fdt_sellus_article_id', articleId)
+            .or(`fdt_sellus_article_id.eq.${articleId},barcode.eq.${articleId}`)
             .maybeSingle();
 
           const productId = product?.id || null;

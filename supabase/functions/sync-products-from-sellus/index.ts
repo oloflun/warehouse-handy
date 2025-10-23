@@ -75,7 +75,8 @@ Deno.serve(async (req) => {
         const articleIdRaw = article.id || article.articleId || article.itemId;
         const articleId = articleIdRaw != null ? String(articleIdRaw) : null;
         const name = article.name || article.description || article.itemName || article.title;
-        const barcode = article.barcode || article.ean || article.gtin || article.articleNumber;
+        const barcode = article.barcode || article.ean || article.gtin || null;
+        const articleNumber = article.articleNumber || article.itemNumber || article.sku || null;
         const category = article.category || article.categoryName || article.itemGroup || article.group;
         const description = article.description || article.longDescription || article.details;
         const minStock = article.minStock || article.minimumStock || article.min_stock || 0;
@@ -102,15 +103,15 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Skip products without barcode (required by DB constraint)
-        if (!barcode) {
-          console.warn(`⚠️ Skipping product ${articleId} (${name}) - missing barcode`);
+        // Skip products without BOTH barcode AND article number
+        if (!barcode && !articleNumber) {
+          console.warn(`⚠️ Skipping product ${articleId} (${name}) - missing both barcode AND article number`);
           await logSync(supabaseClient, {
             sync_type: 'product',
             direction: 'sellus_to_wms',
             fdt_article_id: articleId,
             status: 'error',
-            error_message: 'Missing barcode (required field)',
+            error_message: 'Missing both barcode and article number',
             request_payload: article,
             duration_ms: 0,
           });
@@ -126,7 +127,7 @@ Deno.serve(async (req) => {
 
         const productData = {
           name,
-          barcode,
+          barcode: barcode || articleNumber,
           category,
           description,
           min_stock: minStock,
