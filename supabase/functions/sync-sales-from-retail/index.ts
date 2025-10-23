@@ -25,10 +25,11 @@ Deno.serve(async (req) => {
 
     const since = syncStatus?.last_successful_sync || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-    console.log(`🔄 Fetching orders since ${since}...`);
+    console.log(`🔄 Fetching orders since ${since} for Elon branch (branchId=5)...`);
 
+    // Filter for Elon branch only (branchId=5)
     const result = await callFDTApi({
-      endpoint: `/orders?since=${encodeURIComponent(since)}`,
+      endpoint: `/orders?since=${encodeURIComponent(since)}&branchId=5`,
       method: 'GET',
     });
 

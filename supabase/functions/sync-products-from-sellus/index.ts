@@ -20,8 +20,9 @@ Deno.serve(async (req) => {
     console.log('🔄 Starting product sync from FDT Sellus...');
 
     // Try /items first, fallback to /items/full if needed
+    // Filter for Elon branch only (branchId=5)
     let result = await callFDTApi({
-      endpoint: '/items',
+      endpoint: '/items?branchId=5',
       method: 'GET',
     });
 
@@ -35,7 +36,7 @@ Deno.serve(async (req) => {
     if (!articles || articles.length === 0) {
       console.log('⚠️ /items returned no data, trying /items/full...');
       result = await callFDTApi({
-        endpoint: '/items/full',
+        endpoint: '/items/full?branchId=5',
         method: 'GET',
       });
 

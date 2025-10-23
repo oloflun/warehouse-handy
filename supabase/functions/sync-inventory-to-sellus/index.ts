@@ -67,9 +67,10 @@ Deno.serve(async (req) => {
 
         if (getResult.success && getResult.data) {
           // Update existing item with all fields preserved
-          console.log(`✅ Found existing item in FDT, updating quantity`);
+          console.log(`✅ Found existing item in FDT, updating quantity for Elon branch`);
           updateBody = {
             ...getResult.data,
+            branchId: 5, // Elon branch
             quantity: item.quantity,
             stock: item.quantity,
             availableQuantity: item.quantity,
@@ -78,6 +79,7 @@ Deno.serve(async (req) => {
           // If GET fails, try POST with minimal data
           console.log(`⚠️ Could not fetch existing item, attempting update with minimal data`);
           updateBody = {
+            branchId: 5, // Elon branch
             quantity: item.quantity,
             stock: item.quantity,
             availableQuantity: item.quantity,
