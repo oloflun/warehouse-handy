@@ -69,18 +69,31 @@ const Integrations = () => {
 
       if (error) throw error;
 
+      const successMsg = data?.synced !== undefined 
+        ? `Synkroniserade ${data.synced} poster${data.errors > 0 ? ` (${data.errors} fel)` : ''}`
+        : 'Synkronisering slutförd';
+
       toast({
-        title: "Synkronisering startad",
-        description: data.message || `${syncType} synkronisering slutförd`,
+        title: "Synkronisering slutförd",
+        description: successMsg,
+        variant: data?.errors > 0 ? "destructive" : "default",
       });
 
-      fetchData();
+      // Wait a bit before refreshing to ensure database is updated
+      setTimeout(fetchData, 1000);
     } catch (error: any) {
+      const errorMsg = error.message || 'Okänt fel uppstod';
+      const detailedError = error.context 
+        ? `${errorMsg}\nDetaljer: ${error.context}` 
+        : errorMsg;
+      
       toast({
         title: "Synkroniseringsfel",
-        description: error.message,
+        description: detailedError,
         variant: "destructive",
       });
+      
+      console.error('Sync error details:', error);
     } finally {
       setSyncing(null);
     }

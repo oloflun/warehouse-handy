@@ -29,77 +29,87 @@ Deno.serve(async (req) => {
     }
 
     const articles = Array.isArray(result.data) ? result.data : (result.data.items || []);
+    console.log(`📦 Found ${articles.length} products to sync`);
+    
     let syncedCount = 0;
     let errorCount = 0;
 
     for (const article of articles) {
       try {
+        // Handle multiple possible field name variations from FDT API
+        const articleId = article.id || article.articleId || article.itemId;
+        const name = article.name || article.description || article.itemName || article.title;
+        const barcode = article.barcode || article.ean || article.gtin || article.articleNumber;
+        const category = article.category || article.categoryName || article.itemGroup || article.group;
+        const description = article.description || article.longDescription || article.details;
+        const minStock = article.minStock || article.minimumStock || article.min_stock || 0;
+        const unit = article.unit || article.unitOfMeasure || article.measure || 'st';
+
+        if (!articleId) {
+          console.warn('⚠️ Skipping product without ID:', article);
+          errorCount++;
+          continue;
+        }
+
+        if (!name) {
+          console.warn(`⚠️ Skipping product ${articleId} without name`);
+          errorCount++;
+          continue;
+        }
+
         const { data: existingProduct } = await supabaseClient
           .from('products')
           .select('id')
-          .eq('fdt_sellus_article_id', article.id || article.articleNumber)
+          .eq('fdt_sellus_article_id', articleId)
           .maybeSingle();
 
         const productData = {
-          name: article.name || article.description,
-          barcode: article.barcode || article.ean || article.articleNumber || `FDT-${article.id}`,
-          category: article.category || article.categoryName,
-          description: article.description || article.longDescription,
-          min_stock: article.minStock || 0,
-          unit: article.unit || 'st',
-          fdt_sellus_article_id: article.id || article.articleNumber,
-          fdt_last_synced: new Date().toISOString(),
-          fdt_sync_status: 'synced',
+          name,
+          barcode,
+          category,
+          description,
+          min_stock: minStock,
+          unit,
+          fdt_sellus_article_id: articleId,
         };
 
-        let productId;
-
         if (existingProduct) {
-          const { data, error } = await supabaseClient
+          await supabaseClient
             .from('products')
             .update(productData)
-            .eq('id', existingProduct.id)
-            .select()
-            .single();
-
-          if (error) throw error;
-          productId = existingProduct.id;
+            .eq('id', existingProduct.id);
+          console.log(`✏️ Updated product: ${name} (${articleId})`);
         } else {
-          const { data, error } = await supabaseClient
+          await supabaseClient
             .from('products')
-            .insert(productData)
-            .select()
-            .single();
-
-          if (error) throw error;
-          productId = data.id;
+            .insert(productData);
+          console.log(`➕ Created product: ${name} (${articleId})`);
         }
 
         await logSync(supabaseClient, {
           sync_type: 'product',
           direction: 'sellus_to_wms',
-          fdt_article_id: article.id || article.articleNumber,
-          wms_product_id: productId,
+          fdt_article_id: articleId,
           status: 'success',
-          request_payload: null,
           response_payload: article,
           duration_ms: result.duration,
         });
 
         syncedCount++;
       } catch (error) {
-        console.error(`Error syncing product ${article.id}:`, error);
+        console.error(`❌ Error syncing product:`, error);
+        console.error('📦 Product data:', article);
         
         await logSync(supabaseClient, {
           sync_type: 'product',
           direction: 'sellus_to_wms',
-          fdt_article_id: article.id || article.articleNumber,
+          fdt_article_id: article.id || 'unknown',
           status: 'error',
           error_message: error instanceof Error ? error.message : 'Unknown error',
-          response_payload: article,
-          duration_ms: result.duration,
+          request_payload: article,
+          duration_ms: 0,
         });
-
+        
         errorCount++;
       }
     }

@@ -37,76 +37,194 @@ Deno.serve(async (req) => {
     }
 
     const orders = Array.isArray(result.data) ? result.data : (result.data.orders || []);
+    console.log(`📦 Found ${orders.length} orders to process`);
+    
+    // Filter for completed orders only
+    const completedOrders = orders.filter((order: any) => {
+      const status = order.status || order.orderStatus || '';
+      const orderType = order.type || order.orderType || '';
+      
+      // Skip offers/quotes
+      if (orderType.toLowerCase().includes('quote') || orderType.toLowerCase().includes('offer')) {
+        return false;
+      }
+      
+      // Only include completed/delivered orders
+      return status.toLowerCase().includes('completed') || 
+             status.toLowerCase().includes('delivered') ||
+             status.toLowerCase().includes('closed') ||
+             status.toLowerCase() === 'done';
+    });
+    
+    console.log(`✅ ${completedOrders.length} completed orders after filtering`);
+    
     let syncedCount = 0;
     let errorCount = 0;
 
-    for (const order of orders) {
+    for (const order of completedOrders) {
       try {
-        // Map order details - adjust field names based on actual FDT API response
-        const articleId = order.articleId || order.itemId || order.item_id;
-        const quantity = order.quantity || order.qty || 1;
-        const storeName = order.storeName || order.store || 'Butik';
-        const orderId = order.id || order.orderId || 'unknown';
-        const orderDate = order.date || order.orderDate || new Date().toISOString();
-
-        const { data: product } = await supabaseClient
-          .from('products')
-          .select('id')
-          .eq('fdt_sellus_article_id', articleId)
-          .maybeSingle();
-
-        if (!product) {
-          console.warn(`Product not found for article ID: ${articleId}`);
-          continue;
-        }
-
-        let { data: location } = await supabaseClient
-          .from('locations')
-          .select('id')
-          .eq('name', storeName)
-          .maybeSingle();
-
-        if (!location) {
-          const { data: newLocation, error: locError } = await supabaseClient
-            .from('locations')
-            .insert({ name: storeName })
-            .select()
-            .single();
+        const orderId = order.id || order.orderId || order.orderNumber || 'unknown';
+        const orderDate = order.date || order.orderDate || order.createdAt || order.created_at || new Date().toISOString();
+        const storeName = order.storeName || order.store || order.location || 'Butik';
+        
+        // Handle orders with multiple line items
+        const orderLines = order.lines || order.items || order.details || order.orderLines;
+        
+        if (orderLines && Array.isArray(orderLines)) {
+          console.log(`📋 Order ${orderId} has ${orderLines.length} line items`);
           
-          if (locError || !newLocation) {
-            console.error('Failed to create location:', locError);
+          for (const line of orderLines) {
+            const articleId = line.articleId || line.itemId || line.item_id || line.productId;
+            const quantity = line.quantity || line.qty || line.amount || 1;
+            
+            if (!articleId) {
+              console.warn(`⚠️ Skipping order line without article ID in order ${orderId}`);
+              continue;
+            }
+
+            const { data: product } = await supabaseClient
+              .from('products')
+              .select('id')
+              .eq('fdt_sellus_article_id', articleId)
+              .maybeSingle();
+
+            if (!product) {
+              console.warn(`⚠️ Product not found for article ID: ${articleId} in order ${orderId}`);
+              continue;
+            }
+
+            let { data: location } = await supabaseClient
+              .from('locations')
+              .select('id')
+              .eq('name', storeName)
+              .maybeSingle();
+
+            if (!location) {
+              const { data: newLocation, error: locError } = await supabaseClient
+                .from('locations')
+                .insert({ name: storeName })
+                .select()
+                .single();
+              
+              if (locError || !newLocation) {
+                console.error('❌ Failed to create location:', locError);
+                continue;
+              }
+              location = newLocation;
+              console.log(`➕ Created new location: ${storeName}`);
+            }
+
+            if (!location) {
+              console.error('❌ Location is null after creation attempt');
+              continue;
+            }
+
+            await supabaseClient.from('transactions').insert({
+              product_id: product.id,
+              location_id: location.id,
+              quantity: quantity,
+              type: 'out',
+              notes: `Försäljning från FDT - Order ${orderId}`,
+              created_at: orderDate,
+            });
+
+            await logSync(supabaseClient, {
+              sync_type: 'sale',
+              direction: 'sellus_to_wms',
+              fdt_article_id: articleId,
+              wms_product_id: product.id,
+              status: 'success',
+              response_payload: line,
+              duration_ms: result.duration,
+            });
+
+            syncedCount++;
+          }
+        } else {
+          // Handle single-item order (legacy format)
+          const articleId = order.articleId || order.itemId || order.item_id;
+          const quantity = order.quantity || order.qty || 1;
+
+          if (!articleId) {
+            console.warn(`⚠️ Skipping order ${orderId} without article ID`);
+            errorCount++;
             continue;
           }
-          location = newLocation;
+
+          const { data: product } = await supabaseClient
+            .from('products')
+            .select('id')
+            .eq('fdt_sellus_article_id', articleId)
+            .maybeSingle();
+
+          if (!product) {
+            console.warn(`⚠️ Product not found for article ID: ${articleId}`);
+            errorCount++;
+            continue;
+          }
+
+          let { data: location } = await supabaseClient
+            .from('locations')
+            .select('id')
+            .eq('name', storeName)
+            .maybeSingle();
+
+          if (!location) {
+            const { data: newLocation, error: locError } = await supabaseClient
+              .from('locations')
+              .insert({ name: storeName })
+              .select()
+              .single();
+            
+            if (locError || !newLocation) {
+              console.error('❌ Failed to create location:', locError);
+              errorCount++;
+              continue;
+            }
+            location = newLocation;
+            console.log(`➕ Created new location: ${storeName}`);
+          }
+
+          if (!location) {
+            console.error('❌ Location is null after creation attempt');
+            errorCount++;
+            continue;
+          }
+
+          await supabaseClient.from('transactions').insert({
+            product_id: product.id,
+            location_id: location.id,
+            quantity: quantity,
+            type: 'out',
+            notes: `Försäljning från FDT - Order ${orderId}`,
+            created_at: orderDate,
+          });
+
+          await logSync(supabaseClient, {
+            sync_type: 'sale',
+            direction: 'sellus_to_wms',
+            fdt_article_id: articleId,
+            wms_product_id: product.id,
+            status: 'success',
+            response_payload: order,
+            duration_ms: result.duration,
+          });
+
+          syncedCount++;
         }
-
-        if (!location) {
-          console.error('Location is null after creation attempt');
-          continue;
-        }
-
-        await supabaseClient.from('transactions').insert({
-          product_id: product.id,
-          location_id: location.id,
-          quantity: quantity,
-          type: 'out',
-          notes: `Försäljning från FDT - Order ${orderId}`,
-          created_at: orderDate,
-        });
-
+      } catch (error) {
+        console.error(`❌ Error syncing order:`, error);
+        console.error('📦 Order data:', order);
+        
         await logSync(supabaseClient, {
           sync_type: 'sale',
           direction: 'sellus_to_wms',
-          fdt_article_id: articleId,
-          wms_product_id: product.id,
-          status: 'success',
-          response_payload: order,
-          duration_ms: result.duration,
+          status: 'error',
+          error_message: error instanceof Error ? error.message : 'Unknown error',
+          request_payload: order,
+          duration_ms: 0,
         });
-
-        syncedCount++;
-      } catch (error) {
-        console.error(`Error syncing sale:`, error);
+        
         errorCount++;
       }
     }

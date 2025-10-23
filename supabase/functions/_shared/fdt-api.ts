@@ -13,9 +13,15 @@ export async function callFDTApi({ endpoint, method = 'GET', body }: FDTApiOptio
   }
 
   const startTime = Date.now();
+  const fullUrl = `${baseUrl}${endpoint}`;
+  
+  console.log(`🌐 FDT API ${method} ${fullUrl}`);
+  if (body && (method === 'POST' || method === 'PUT')) {
+    console.log('📤 Request body:', JSON.stringify(body, null, 2));
+  }
   
   try {
-    const response = await fetch(`${baseUrl}${endpoint}`, {
+    const response = await fetch(fullUrl, {
       method,
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -29,10 +35,14 @@ export async function callFDTApi({ endpoint, method = 'GET', body }: FDTApiOptio
     
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(`❌ FDT API Error ${response.status}:`, errorText);
+      console.error(`📍 Request: ${method} ${fullUrl}`);
+      console.error(`⏱️ Duration: ${duration}ms`);
       throw new Error(`FDT API error (${response.status}): ${errorText}`);
     }
 
     const data = await response.json();
+    console.log(`✅ FDT API Success - Duration: ${duration}ms`);
     
     return {
       success: true,
@@ -41,6 +51,9 @@ export async function callFDTApi({ endpoint, method = 'GET', body }: FDTApiOptio
     };
   } catch (error) {
     const duration = Date.now() - startTime;
+    console.error(`❌ FDT API Exception:`, error);
+    console.error(`📍 Request: ${method} ${fullUrl}`);
+    console.error(`⏱️ Duration: ${duration}ms`);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

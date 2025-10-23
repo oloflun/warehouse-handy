@@ -32,6 +32,8 @@ Deno.serve(async (req) => {
     let syncedCount = 0;
     let errorCount = 0;
 
+    console.log(`📦 Found ${inventory.length} inventory items to sync`);
+
     for (const item of inventory) {
       try {
         // Get product details
@@ -41,7 +43,10 @@ Deno.serve(async (req) => {
           .eq('id', item.product_id)
           .maybeSingle();
         
-        if (!product?.fdt_sellus_article_id) continue;
+        if (!product?.fdt_sellus_article_id) {
+          console.warn(`⚠️ Skipping product ${item.product_id} - no FDT article ID`);
+          continue;
+        }
         
         // Get location details
         const { data: location } = await supabaseClient
@@ -50,19 +55,47 @@ Deno.serve(async (req) => {
           .eq('id', item.location_id)
           .maybeSingle();
 
+        console.log(`🔄 Syncing ${product.name} (${product.fdt_sellus_article_id}) - Quantity: ${item.quantity}`);
+
+        // First, try to get the existing item data from FDT
+        const getResult = await callFDTApi({
+          endpoint: `/items/${product.fdt_sellus_article_id}`,
+          method: 'GET',
+        });
+
+        let updateBody: any;
+
+        if (getResult.success && getResult.data) {
+          // Update existing item with all fields preserved
+          console.log(`✅ Found existing item in FDT, updating quantity`);
+          updateBody = {
+            ...getResult.data,
+            quantity: item.quantity,
+            stock: item.quantity,
+            availableQuantity: item.quantity,
+          };
+        } else {
+          // If GET fails, try POST with minimal data
+          console.log(`⚠️ Could not fetch existing item, attempting update with minimal data`);
+          updateBody = {
+            quantity: item.quantity,
+            stock: item.quantity,
+            availableQuantity: item.quantity,
+          };
+        }
+
         // Update item using POST /items/{id} endpoint
         const result = await callFDTApi({
           endpoint: `/items/${product.fdt_sellus_article_id}`,
           method: 'POST',
-          body: {
-            quantity: item.quantity,
-            // Add other fields as needed based on FDT API requirements
-          },
+          body: updateBody,
         });
 
         if (!result.success) {
           throw new Error(result.error);
         }
+
+        console.log(`✅ Successfully synced ${product.name}`);
 
         await logSync(supabaseClient, {
           sync_type: 'inventory',
@@ -77,7 +110,7 @@ Deno.serve(async (req) => {
 
         syncedCount++;
       } catch (error) {
-        console.error(`Error syncing inventory:`, error);
+        console.error(`❌ Error syncing inventory:`, error);
         
         await logSync(supabaseClient, {
           sync_type: 'inventory',
