@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Scan, Package, Plus, Minus } from "lucide-react";
+import { Scan, Package, Plus, Minus, CloudUpload } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const Scanner = () => {
@@ -167,6 +167,36 @@ const Scanner = () => {
       user_id: user.id,
       notes: `Plockning för order ${selectedOrder.order_number}`
     });
+
+    // Sync to Sellus if product has FDT connection
+    if (product.fdt_sellus_article_id) {
+      toast.loading("Uppdaterar lagersaldo i Sellus...", { id: "sellus-sync" });
+      
+      const { data: syncResult, error: syncError } = await supabase.functions.invoke(
+        'update-sellus-stock',
+        {
+          body: {
+            productId: product.id,
+            quantity: quantityToPick,
+            locationId: selectedLocation || locations[0]?.id,
+          }
+        }
+      );
+      
+      if (syncError || !syncResult?.success) {
+        console.error("Sellus sync error:", syncError || syncResult?.error);
+        toast.error("⚠️ Artikel plockad men misslyckades synka till Sellus", {
+          id: "sellus-sync",
+          duration: 5000,
+        });
+      } else if (!syncResult?.skipped) {
+        toast.success("✅ Artikel plockad och synkad till Sellus", {
+          id: "sellus-sync",
+        });
+      } else {
+        toast.dismiss("sellus-sync");
+      }
+    }
     
     const { data: remainingLines } = await supabase
       .from('order_lines')
@@ -236,6 +266,37 @@ const Scanner = () => {
     toast.success(
       `${transactionType === "in" ? "Inleverans" : "Utleverans"} registrerad!`
     );
+
+    // Sync to Sellus if product has FDT connection
+    if (product.fdt_sellus_article_id) {
+      toast.loading("Uppdaterar lagersaldo i Sellus...", { id: "sellus-sync" });
+      
+      const { data: syncResult, error: syncError } = await supabase.functions.invoke(
+        'update-sellus-stock',
+        {
+          body: {
+            productId: product.id,
+            quantity: transactionType === 'in' ? quantity : -quantity,
+            locationId: selectedLocation,
+          }
+        }
+      );
+      
+      if (syncError || !syncResult?.success) {
+        console.error("Sellus sync error:", syncError || syncResult?.error);
+        toast.error("⚠️ Lagersaldo uppdaterat i WMS men misslyckades synka till Sellus", {
+          id: "sellus-sync",
+          duration: 5000,
+        });
+      } else if (!syncResult?.skipped) {
+        toast.success("✅ Lagersaldo uppdaterat i både WMS och Sellus", {
+          id: "sellus-sync",
+        });
+      } else {
+        toast.dismiss("sellus-sync");
+      }
+    }
+
     setProduct(null);
     setScannedCode("");
     setManualCode("");
@@ -323,9 +384,10 @@ const Scanner = () => {
                     <p className="font-medium">{product.fdt_sellus_article_id}</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Synk-status:</span>
-                    <p className="font-medium text-green-600">
-                      {product.fdt_sync_status === 'synced' ? '✓ Synkad' : 'Väntande'}
+                    <span className="text-muted-foreground">Sellus-synk:</span>
+                    <p className="font-medium text-green-600 flex items-center gap-1">
+                      <CloudUpload className="h-4 w-4" />
+                      Aktiverad
                     </p>
                   </div>
                 </>
