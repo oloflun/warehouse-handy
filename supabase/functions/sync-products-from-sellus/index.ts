@@ -71,16 +71,20 @@ Deno.serve(async (req) => {
 
     for (const article of articles) {
       try {
-        // Handle multiple possible field name variations from FDT API
-        const articleIdRaw = article.id || article.articleId || article.itemId;
-        const articleId = articleIdRaw != null ? String(articleIdRaw) : null;
-        const name = article.name || article.description || article.itemName || article.title;
-        const barcode = article.barcode || article.ean || article.gtin || null;
-        const articleNumber = article.articleNumber || article.itemNumber || article.sku || null;
-        const category = article.category || article.categoryName || article.itemGroup || article.group;
-        const description = article.description || article.longDescription || article.details;
-        const minStock = article.minStock || article.minimumStock || article.min_stock || 0;
-        const unit = article.unit || article.unitOfMeasure || article.measure || 'st';
+        // Log full article object to understand FDT's exact field structure
+        console.log('📦 Full FDT article object:', JSON.stringify(article, null, 2));
+        
+        // Use exact field names from FDT - don't guess or fallback
+        const articleId = article.id != null ? String(article.id) : null;
+        const name = article.name || null;
+        const barcode = article.barcode || null;
+        const articleNumber = article.itemNumber || null;
+        const category = article.category || null;
+        const description = article.description || null;
+        const minStock = article.minStock || 0;
+        const unit = article.unit || 'st';
+        const purchasePrice = article.purchasePrice || null;
+        const salesPrice = article.unitPrice || null;
 
         if (!articleId) {
           console.warn('⚠️ Skipping product without ID:', article);
@@ -133,6 +137,8 @@ Deno.serve(async (req) => {
           min_stock: minStock,
           unit,
           fdt_sellus_article_id: articleId,
+          purchase_price: purchasePrice,
+          sales_price: salesPrice,
         };
 
         if (existingProduct) {

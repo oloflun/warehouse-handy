@@ -62,6 +62,9 @@ Deno.serve(async (req) => {
 
     for (const order of validOrders) {
       try {
+        // Log full order object to understand FDT's exact field structure
+        console.log('📦 Full FDT order object:', JSON.stringify(order, null, 2));
+        
         const orderId = order.id || order.orderId || order.orderNumber || 'unknown';
         const orderDate = order.date || order.orderDate || order.createdAt || order.created_at || new Date().toISOString();
         const storeName = order.storeName || order.store || order.location || 'Butik';
@@ -161,6 +164,9 @@ Deno.serve(async (req) => {
           console.log(`📋 Order ${orderId} has ${orderLines.length} line items`);
           
           for (const line of orderLines) {
+            // Log full order line object to understand FDT's exact field structure
+            console.log('📋 Full FDT order line object:', JSON.stringify(line, null, 2));
+            
             // Handle multiple possible field name variations and cast to string
             const articleIdRaw = line.articleId || line.itemId || line.item_id || line.productId || 
                                  line.articleNumber || line.itemNumber || line.sku;
