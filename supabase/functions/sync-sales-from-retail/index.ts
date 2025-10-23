@@ -167,21 +167,23 @@ Deno.serve(async (req) => {
             const articleId = articleIdRaw != null ? String(articleIdRaw) : null;
             const quantity = line.quantity || line.qty || line.amount || 1;
             
-              if (!articleId) {
-                console.warn(`⚠️ Skipping order line without article ID in order ${orderId}`);
-                console.warn(`📋 Line object keys: ${Object.keys(line).join(', ')}`);
-                continue;
-              }
+            if (!articleId) {
+              console.warn(`⚠️ Skipping order line without article ID in order ${orderId}`);
+              console.warn(`📋 Line object keys: ${Object.keys(line).join(', ')}`);
+              continue;
+            }
 
+            // Try to find product, but proceed even if not found
             const { data: product } = await supabaseClient
               .from('products')
               .select('id')
               .eq('fdt_sellus_article_id', articleId)
               .maybeSingle();
 
-            if (!product) {
-              console.warn(`⚠️ Product not found for article ID: ${articleId} in order ${orderId}`);
-              continue;
+            const productId = product?.id || null;
+
+            if (!productId) {
+              console.log(`ℹ️ Product not yet synced for article ID: ${articleId} - creating order line anyway`);
             }
 
             // Check if order line already exists
@@ -189,7 +191,7 @@ Deno.serve(async (req) => {
               .from('order_lines')
               .select('id')
               .eq('order_id', dbOrder.id)
-              .eq('product_id', product.id)
+              .eq('fdt_article_id', articleId)
               .maybeSingle();
               
             if (!existingLine) {
@@ -197,29 +199,32 @@ Deno.serve(async (req) => {
                 .from('order_lines')
                 .insert({
                   order_id: dbOrder.id,
-                  product_id: product.id,
+                  product_id: productId,
                   fdt_article_id: articleId,
                   quantity_ordered: quantity,
                   quantity_picked: 0,
                   is_picked: false
                 });
+              console.log(`➕ Created order line for article ${articleId} (product_id: ${productId || 'pending'})`);
             }
 
-            // Create transaction for inventory tracking
-            await supabaseClient.from('transactions').insert({
-              product_id: product.id,
-              location_id: location.id,
-              quantity: quantity,
-              type: 'out',
-              notes: `Försäljning från FDT (Retail + E-handel) - Order ${orderId}`,
-              created_at: orderDate,
-            });
+            // Only create transaction if product exists (can't update inventory without product)
+            if (productId) {
+              await supabaseClient.from('transactions').insert({
+                product_id: productId,
+                location_id: location.id,
+                quantity: quantity,
+                type: 'out',
+                notes: `Försäljning från FDT (Retail + E-handel) - Order ${orderId}`,
+                created_at: orderDate,
+              });
+            }
 
             await logSync(supabaseClient, {
               sync_type: 'sale',
               direction: 'sellus_to_wms',
               fdt_article_id: articleId,
-              wms_product_id: product.id,
+              wms_product_id: productId,
               status: 'success',
               response_payload: line,
               duration_ms: result.duration,
@@ -238,16 +243,17 @@ Deno.serve(async (req) => {
             continue;
           }
 
+          // Try to find product, but proceed even if not found
           const { data: product } = await supabaseClient
             .from('products')
             .select('id')
             .eq('fdt_sellus_article_id', articleId)
             .maybeSingle();
 
-          if (!product) {
-            console.warn(`⚠️ Product not found for article ID: ${articleId}`);
-            errorCount++;
-            continue;
+          const productId = product?.id || null;
+
+          if (!productId) {
+            console.log(`ℹ️ Product not yet synced for article ID: ${articleId} - creating order line anyway`);
           }
 
           // Check if order line already exists
@@ -255,7 +261,7 @@ Deno.serve(async (req) => {
             .from('order_lines')
             .select('id')
             .eq('order_id', dbOrder.id)
-            .eq('product_id', product.id)
+            .eq('fdt_article_id', articleId)
             .maybeSingle();
             
           if (!existingLine) {
@@ -263,29 +269,32 @@ Deno.serve(async (req) => {
               .from('order_lines')
               .insert({
                 order_id: dbOrder.id,
-                product_id: product.id,
+                product_id: productId,
                 fdt_article_id: articleId,
                 quantity_ordered: quantity,
                 quantity_picked: 0,
                 is_picked: false
               });
+            console.log(`➕ Created order line for article ${articleId} (product_id: ${productId || 'pending'})`);
           }
 
-          // Create transaction for inventory tracking
-          await supabaseClient.from('transactions').insert({
-            product_id: product.id,
-            location_id: location.id,
-            quantity: quantity,
-            type: 'out',
-            notes: `Försäljning från FDT (Retail + E-handel) - Order ${orderId}`,
-            created_at: orderDate,
-          });
+          // Only create transaction if product exists
+          if (productId) {
+            await supabaseClient.from('transactions').insert({
+              product_id: productId,
+              location_id: location.id,
+              quantity: quantity,
+              type: 'out',
+              notes: `Försäljning från FDT (Retail + E-handel) - Order ${orderId}`,
+              created_at: orderDate,
+            });
+          }
 
           await logSync(supabaseClient, {
             sync_type: 'sale',
             direction: 'sellus_to_wms',
             fdt_article_id: articleId,
-            wms_product_id: product.id,
+            wms_product_id: productId,
             status: 'success',
             response_payload: order,
             duration_ms: result.duration,
@@ -310,22 +319,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Check if products table is empty and warn
-    const { count: productCount } = await supabaseClient
-      .from('products')
-      .select('*', { count: 'exact', head: true });
-    
-    const lastError = productCount === 0 
-      ? 'No products found - run product_import first'
-      : null;
-
+    // Update sync status
     await supabaseClient
       .from('fdt_sync_status')
       .update({
         last_successful_sync: new Date().toISOString(),
         total_synced: syncedCount,
         total_errors: errorCount,
-        last_error: lastError,
+        last_error: null,
         updated_at: new Date().toISOString(),
       })
       .eq('sync_type', 'sale_import');
