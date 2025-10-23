@@ -64,6 +64,36 @@ export type Database = {
           },
         ]
       }
+      fdt_sync_metadata: {
+        Row: {
+          created_at: string | null
+          id: string
+          last_sync_at: string
+          metadata: Json | null
+          sync_type: string
+          total_items_in_fdt: number | null
+          total_items_in_wms: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          last_sync_at?: string
+          metadata?: Json | null
+          sync_type: string
+          total_items_in_fdt?: number | null
+          total_items_in_wms?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          last_sync_at?: string
+          metadata?: Json | null
+          sync_type?: string
+          total_items_in_fdt?: number | null
+          total_items_in_wms?: number | null
+        }
+        Relationships: []
+      }
       fdt_sync_status: {
         Row: {
           id: string

@@ -196,15 +196,38 @@ Deno.serve(async (req) => {
               console.log(`✅ Matched product: ${product?.name} for article: ${fdtArticleId}`);
             }
 
-            // Check if order line already exists
+            // Check if order line already exists with correct article ID
             const { data: existingLine } = await supabaseClient
               .from('order_lines')
-              .select('id')
+              .select('id, fdt_article_id, product_id')
               .eq('order_id', dbOrder.id)
               .eq('fdt_article_id', fdtArticleId)
               .maybeSingle();
-              
-            if (!existingLine) {
+
+            // Check if there's an old line with wrong article ID that needs healing
+            const { data: oldLine } = await supabaseClient
+              .from('order_lines')
+              .select('id, fdt_article_id, product_id')
+              .eq('order_id', dbOrder.id)
+              .is('product_id', null) // Old lines with failed product matching
+              .neq('fdt_article_id', fdtArticleId) // Different article ID
+              .maybeSingle();
+
+            if (existingLine) {
+              console.log(`✅ Order line already exists for ${fdtArticleId}`);
+            } else if (oldLine && productId) {
+              // "Heal" the old line by updating it with correct data
+              await supabaseClient
+                .from('order_lines')
+                .update({
+                  fdt_article_id: fdtArticleId,
+                  product_id: productId,
+                  quantity_ordered: quantity,
+                })
+                .eq('id', oldLine.id);
+              console.log(`🩹 Healed order line: ${oldLine.fdt_article_id} → ${fdtArticleId} (product_id: ${productId})`);
+            } else {
+              // Create new order line
               await supabaseClient
                 .from('order_lines')
                 .insert({
@@ -328,6 +351,76 @@ Deno.serve(async (req) => {
         errorCount++;
       }
     }
+
+    // Zombie order cleanup - remove orders that no longer exist in FDT
+    const fdtOrderIds = validOrders.map((o: any) => String(o.id || o.orderId || o.orderNumber));
+    console.log(`📋 FDT has ${fdtOrderIds.length} active orders`);
+
+    // Safety check: only proceed with cleanup if we got a reasonable number of orders
+    if (fdtOrderIds.length >= 5) {
+      // Find orders in database that are NOT in FDT response
+      const { data: dbOrders } = await supabaseClient
+        .from('orders')
+        .select('id, fdt_order_id, order_date, status')
+        .not('fdt_order_id', 'in', `(${fdtOrderIds.join(',')})`);
+
+      if (dbOrders && dbOrders.length > 0) {
+        console.log(`🔍 Found ${dbOrders.length} orders not in FDT response`);
+        
+        let deletedOrders = 0;
+        const cutoffDate = new Date();
+        cutoffDate.setHours(cutoffDate.getHours() - 24); // 24 hours ago
+        
+        for (const dbOrder of dbOrders) {
+          const orderDate = new Date(dbOrder.order_date);
+          
+          // Safety: only delete orders older than 24h
+          if (orderDate < cutoffDate) {
+            // Delete order lines first (foreign key)
+            await supabaseClient
+              .from('order_lines')
+              .delete()
+              .eq('order_id', dbOrder.id);
+            
+            // Delete the order
+            await supabaseClient
+              .from('orders')
+              .delete()
+              .eq('id', dbOrder.id);
+            
+            deletedOrders++;
+            console.log(`🗑️ Deleted zombie order: ${dbOrder.fdt_order_id} (${dbOrder.order_date})`);
+          } else {
+            console.log(`⏳ Keeping recent order ${dbOrder.fdt_order_id} (might reappear in FDT)`);
+          }
+        }
+        
+        console.log(`✅ Deleted ${deletedOrders} zombie orders`);
+      }
+    } else {
+      console.warn(`⚠️ FDT returned only ${fdtOrderIds.length} orders - skipping zombie cleanup to prevent data loss`);
+    }
+
+    // Get total orders in WMS for metadata tracking
+    const { count: totalWmsOrders } = await supabaseClient
+      .from('orders')
+      .select('*', { count: 'exact', head: true });
+
+    // Save sync metadata snapshot
+    await supabaseClient
+      .from('fdt_sync_metadata')
+      .insert({
+        sync_type: 'sales',
+        last_sync_at: new Date().toISOString(),
+        total_items_in_fdt: fdtOrderIds.length,
+        total_items_in_wms: totalWmsOrders || 0,
+        metadata: {
+          synced_count: syncedCount,
+          error_count: errorCount,
+          valid_orders: validOrders.length,
+          total_orders: orders.length
+        }
+      });
 
     // Update sync status
     await supabaseClient
