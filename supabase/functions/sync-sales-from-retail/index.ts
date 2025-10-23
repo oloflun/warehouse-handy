@@ -167,8 +167,8 @@ Deno.serve(async (req) => {
             // Log full order line object to understand FDT's exact field structure
             console.log('📋 Full FDT order line object:', JSON.stringify(line, null, 2));
             
-            // Use itemNumber (article number like "1201") instead of itemId (internal ID like "297091")
-            const articleNumber = line.itemNumber || line.articleNumber || line.sku || null;
+            // Prioritize itemNumber from nested item object (e.g. line.item.itemNumber = "1201")
+            const articleNumber = line.item?.itemNumber || line.itemNumber || line.articleNumber || line.sku || null;
             const internalId = line.itemId || line.item_id || line.productId || null;
             const quantity = line.quantity || line.qty || line.amount || 1;
             

@@ -162,7 +162,7 @@ Deno.serve(async (req) => {
           description,
           min_stock: minStock,
           unit,
-          fdt_sellus_article_id: articleId,
+          fdt_sellus_article_id: articleNumber || articleId, // Prefer itemNumber (e.g. "1201") over internal ID
           purchase_price: purchasePrice,
           sales_price: salesPrice,
         };
