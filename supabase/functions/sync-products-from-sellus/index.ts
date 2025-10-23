@@ -19,8 +19,9 @@ Deno.serve(async (req) => {
 
     console.log('🔄 Starting product sync from FDT Sellus...');
 
-    const result = await callFDTApi({
-      endpoint: '/items/full',
+    // Try /items first, fallback to /items/full if needed
+    let result = await callFDTApi({
+      endpoint: '/items',
       method: 'GET',
     });
 
@@ -28,7 +29,23 @@ Deno.serve(async (req) => {
       throw new Error(result.error);
     }
 
-    const articles = Array.isArray(result.data) ? result.data : (result.data.items || []);
+    let articles = Array.isArray(result.data) ? result.data : (result.data.items || []);
+    
+    // If /items didn't return data, try /items/full
+    if (!articles || articles.length === 0) {
+      console.log('⚠️ /items returned no data, trying /items/full...');
+      result = await callFDTApi({
+        endpoint: '/items/full',
+        method: 'GET',
+      });
+
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+
+      articles = Array.isArray(result.data) ? result.data : (result.data.items || []);
+    }
+
     console.log(`📦 Found ${articles.length} products to sync`);
     
     let syncedCount = 0;
@@ -139,13 +156,16 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('❌ Product sync error:', error);
     
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    const isAuthError = errorMsg.includes('401') || errorMsg.toLowerCase().includes('auth');
+    
     return new Response(
       JSON.stringify({
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: errorMsg,
       }),
       { 
-        status: 500,
+        status: isAuthError ? 502 : 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );

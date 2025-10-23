@@ -148,13 +148,16 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('❌ Inventory sync error:', error);
     
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    const isAuthError = errorMsg.includes('401') || errorMsg.toLowerCase().includes('auth');
+    
     return new Response(
       JSON.stringify({
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: errorMsg,
       }),
       { 
-        status: 500,
+        status: isAuthError ? 502 : 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );

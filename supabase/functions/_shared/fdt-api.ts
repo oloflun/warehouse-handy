@@ -4,6 +4,23 @@ interface FDTApiOptions {
   body?: any;
 }
 
+async function tryFetchWithAuthStrategy(
+  url: string,
+  method: string,
+  body: any,
+  authHeader: { [key: string]: string }
+): Promise<Response> {
+  return await fetch(url, {
+    method,
+    headers: {
+      ...authHeader,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+}
+
 export async function callFDTApi({ endpoint, method = 'GET', body }: FDTApiOptions) {
   const baseUrl = Deno.env.get('FDT_SELLUS_BASE_URL');
   const apiKey = Deno.env.get('FDT_SELLUS_API_KEY');
@@ -20,35 +37,57 @@ export async function callFDTApi({ endpoint, method = 'GET', body }: FDTApiOptio
     console.log('📤 Request body:', JSON.stringify(body, null, 2));
   }
   
+  // Try multiple auth strategies
+  const authStrategies: Array<{ name: string; headers: Record<string, string> }> = [
+    { name: 'Bearer', headers: { 'Authorization': `Bearer ${apiKey}` } },
+    { name: 'X-Api-Key', headers: { 'X-Api-Key': apiKey } },
+    { name: 'ApiKey', headers: { 'Authorization': `ApiKey ${apiKey}` } },
+  ];
+  
+  let lastResponse: Response | null = null;
+  let lastError: Error | null = null;
+  
   try {
-    const response = await fetch(fullUrl, {
-      method,
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-
+    for (const strategy of authStrategies) {
+      console.log(`🔐 Trying auth strategy: ${strategy.name}`);
+      
+      const response = await tryFetchWithAuthStrategy(fullUrl, method, body, strategy.headers);
+      lastResponse = response;
+      
+      if (response.ok) {
+        const duration = Date.now() - startTime;
+        console.log(`✅ Auth success with ${strategy.name} - Duration: ${duration}ms`);
+        const data = await response.json();
+        return {
+          success: true,
+          data,
+          duration,
+        };
+      }
+      
+      if (response.status === 401) {
+        console.warn(`❌ Auth failed with ${strategy.name} (401 Unauthorized)`);
+        continue; // Try next strategy
+      }
+      
+      // Non-401 error, stop trying
+      break;
+    }
+    
     const duration = Date.now() - startTime;
     
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`❌ FDT API Error ${response.status}:`, errorText);
-      console.error(`📍 Request: ${method} ${fullUrl}`);
+    if (lastResponse && !lastResponse.ok) {
+      const errorText = await lastResponse.text();
+      const authMsg = lastResponse.status === 401 
+        ? ' - All auth strategies failed (Bearer, X-Api-Key, ApiKey). Check API key and permissions.'
+        : '';
+      console.error(`❌ FDT API Error ${lastResponse.status}:`, errorText);
+      console.error(`📍 Request: ${method} ${fullUrl}${authMsg}`);
       console.error(`⏱️ Duration: ${duration}ms`);
-      throw new Error(`FDT API error (${response.status}): ${errorText}`);
+      throw new Error(`FDT API error (${lastResponse.status}): ${errorText}${authMsg}`);
     }
-
-    const data = await response.json();
-    console.log(`✅ FDT API Success - Duration: ${duration}ms`);
     
-    return {
-      success: true,
-      data,
-      duration,
-    };
+    throw new Error('FDT API request failed with no response');
   } catch (error) {
     const duration = Date.now() - startTime;
     console.error(`❌ FDT API Exception:`, error);

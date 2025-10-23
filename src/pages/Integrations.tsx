@@ -82,14 +82,30 @@ const Integrations = () => {
       // Wait a bit before refreshing to ensure database is updated
       setTimeout(fetchData, 1000);
     } catch (error: any) {
-      const errorMsg = error.message || 'Okänt fel uppstod';
-      const detailedError = error.context 
-        ? `${errorMsg}\nDetaljer: ${error.context}` 
-        : errorMsg;
+      let errorMsg = error.message || 'Okänt fel uppstod';
+      
+      // If error.context is a Response object, try to extract details
+      if (error.context && typeof error.context === 'object') {
+        try {
+          if (error.context instanceof Response) {
+            const responseText = await error.context.text();
+            try {
+              const responseJson = JSON.parse(responseText);
+              errorMsg = responseJson.error || responseJson.message || `${error.context.status} ${error.context.statusText}`;
+            } catch {
+              errorMsg = `${error.context.status} ${error.context.statusText}: ${responseText}`;
+            }
+          } else if (error.context.error) {
+            errorMsg = error.context.error;
+          }
+        } catch (e) {
+          console.error('Failed to parse error context:', e);
+        }
+      }
       
       toast({
         title: "Synkroniseringsfel",
-        description: detailedError,
+        description: errorMsg,
         variant: "destructive",
       });
       
