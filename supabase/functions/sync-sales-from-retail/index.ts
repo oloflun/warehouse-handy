@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
 
     const since = syncStatus?.last_successful_sync || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-    console.log(`🔄 Fetching orders since ${since} for Elon branch (branchId=5)...`);
+    console.log(`🔄 Fetching all orders (retail + e-commerce) since ${since} for Elon branch (branchId=5)...`);
 
     // Filter for Elon branch only (branchId=5)
     const result = await callFDTApi({
@@ -40,29 +40,35 @@ Deno.serve(async (req) => {
     const orders = Array.isArray(result.data) ? result.data : (result.data.orders || []);
     console.log(`📦 Found ${orders.length} orders to process`);
     
-    // Filter for completed orders only
-    const completedOrders = orders.filter((order: any) => {
+    // Filter out only quotes/offers/drafts, include all paid orders (retail + e-commerce)
+    const validOrders = orders.filter((order: any) => {
       const status = order.status || order.orderStatus || '';
       const orderType = order.type || order.orderType || '';
       
-      // Skip offers/quotes
-      if (orderType.toLowerCase().includes('quote') || orderType.toLowerCase().includes('offer')) {
+      // Exclude only quotes/offers/drafts (unpaid orders)
+      if (orderType.toLowerCase().includes('quote') || 
+          orderType.toLowerCase().includes('offer') ||
+          orderType.toLowerCase().includes('draft')) {
         return false;
       }
       
-      // Only include completed/delivered orders
-      return status.toLowerCase().includes('completed') || 
-             status.toLowerCase().includes('delivered') ||
-             status.toLowerCase().includes('closed') ||
-             status.toLowerCase() === 'done';
+      // Include all paid/confirmed orders from both retail POS and e-commerce
+      const validStatuses = [
+        'completed', 'delivered', 'closed', 'done',        // Retail POS
+        'paid', 'confirmed', 'processing', 'shipped',      // E-commerce from Sellus
+        'ready', 'fulfilled', 'invoiced'                   // Other possible statuses
+      ];
+      
+      const statusLower = status.toLowerCase();
+      return validStatuses.some(validStatus => statusLower.includes(validStatus));
     });
     
-    console.log(`✅ ${completedOrders.length} completed orders after filtering`);
+    console.log(`✅ ${validOrders.length} valid orders after filtering (excluded quotes/drafts)`);
     
     let syncedCount = 0;
     let errorCount = 0;
 
-    for (const order of completedOrders) {
+    for (const order of validOrders) {
       try {
         const orderId = order.id || order.orderId || order.orderNumber || 'unknown';
         const orderDate = order.date || order.orderDate || order.createdAt || order.created_at || new Date().toISOString();
@@ -125,7 +131,7 @@ Deno.serve(async (req) => {
               location_id: location.id,
               quantity: quantity,
               type: 'out',
-              notes: `Försäljning från FDT - Order ${orderId}`,
+              notes: `Försäljning från FDT (Retail + E-handel) - Order ${orderId}`,
               created_at: orderDate,
             });
 
@@ -197,7 +203,7 @@ Deno.serve(async (req) => {
             location_id: location.id,
             quantity: quantity,
             type: 'out',
-            notes: `Försäljning från FDT - Order ${orderId}`,
+            notes: `Försäljning från FDT (Retail + E-handel) - Order ${orderId}`,
             created_at: orderDate,
           });
 
