@@ -30,7 +30,14 @@ Deno.serve(async (req) => {
       throw new Error(result.error);
     }
 
-    let articles = Array.isArray(result.data) ? result.data : (result.data.items || []);
+    // Robust parsing of articles array
+    const payload = result.data || {};
+    let articles = Array.isArray(payload)
+      ? payload
+      : payload.results || payload.items || payload.data || [];
+    
+    console.log('🔍 FDT payload keys:', Object.keys(payload));
+    console.log(`📦 Found ${articles.length} products from /items`);
     
     // If /items didn't return data, try /items/full
     if (!articles || articles.length === 0) {
@@ -44,10 +51,20 @@ Deno.serve(async (req) => {
         throw new Error(result.error);
       }
 
-      articles = Array.isArray(result.data) ? result.data : (result.data.items || []);
+      const fullPayload = result.data || {};
+      articles = Array.isArray(fullPayload)
+        ? fullPayload
+        : fullPayload.results || fullPayload.items || fullPayload.data || [];
+      
+      console.log('🔍 FDT /items/full payload keys:', Object.keys(fullPayload));
+      console.log(`📦 Found ${articles.length} products from /items/full`);
     }
 
-    console.log(`📦 Found ${articles.length} products to sync`);
+    if (!articles || articles.length === 0) {
+      console.log('⚠️ No products found from FDT API - check API endpoint or branchId');
+    }
+    
+    console.log(`📦 Total ${articles.length} products to sync`);
     
     let syncedCount = 0;
     let errorCount = 0;
@@ -55,7 +72,8 @@ Deno.serve(async (req) => {
     for (const article of articles) {
       try {
         // Handle multiple possible field name variations from FDT API
-        const articleId = article.id || article.articleId || article.itemId;
+        const articleIdRaw = article.id || article.articleId || article.itemId;
+        const articleId = articleIdRaw != null ? String(articleIdRaw) : null;
         const name = article.name || article.description || article.itemName || article.title;
         const barcode = article.barcode || article.ean || article.gtin || article.articleNumber;
         const category = article.category || article.categoryName || article.itemGroup || article.group;

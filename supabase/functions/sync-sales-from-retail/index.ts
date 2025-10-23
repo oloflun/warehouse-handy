@@ -161,13 +161,17 @@ Deno.serve(async (req) => {
           console.log(`📋 Order ${orderId} has ${orderLines.length} line items`);
           
           for (const line of orderLines) {
-            const articleId = line.articleId || line.itemId || line.item_id || line.productId;
+            // Handle multiple possible field name variations and cast to string
+            const articleIdRaw = line.articleId || line.itemId || line.item_id || line.productId || 
+                                 line.articleNumber || line.itemNumber || line.sku;
+            const articleId = articleIdRaw != null ? String(articleIdRaw) : null;
             const quantity = line.quantity || line.qty || line.amount || 1;
             
-            if (!articleId) {
-              console.warn(`⚠️ Skipping order line without article ID in order ${orderId}`);
-              continue;
-            }
+              if (!articleId) {
+                console.warn(`⚠️ Skipping order line without article ID in order ${orderId}`);
+                console.warn(`📋 Line object keys: ${Object.keys(line).join(', ')}`);
+                continue;
+              }
 
             const { data: product } = await supabaseClient
               .from('products')
@@ -306,12 +310,22 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Check if products table is empty and warn
+    const { count: productCount } = await supabaseClient
+      .from('products')
+      .select('*', { count: 'exact', head: true });
+    
+    const lastError = productCount === 0 
+      ? 'No products found - run product_import first'
+      : null;
+
     await supabaseClient
       .from('fdt_sync_status')
       .update({
         last_successful_sync: new Date().toISOString(),
         total_synced: syncedCount,
         total_errors: errorCount,
+        last_error: lastError,
         updated_at: new Date().toISOString(),
       })
       .eq('sync_type', 'sale_import');
