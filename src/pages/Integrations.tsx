@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCw, ArrowLeft, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { RefreshCw, ArrowLeft, CheckCircle2, XCircle, Clock, Package, List, ShoppingCart, ChevronRight } from "lucide-react";
 
 interface SyncStatus {
   id: string;
@@ -117,7 +117,7 @@ const Integrations = () => {
 
   const getSyncTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
-      'product_import': 'Produkter från Sellus',
+      'product_import': 'Artiklar',
       'inventory_export': 'Lagersaldo till Sellus',
       'sale_import': 'Försäljning',
     };
@@ -148,54 +148,94 @@ const Integrations = () => {
             <p className="text-muted-foreground">Hantera synkronisering med FDT Sellus & Excellence Retail</p>
           </div>
         </div>
-        <Button onClick={() => navigate('/fdt-explorer')} variant="outline">
-          API Explorer
-        </Button>
-        <Button onClick={fetchData} variant="outline" size="icon">
-          <RefreshCw className="h-4 w-4" />
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => navigate('/fdt-explorer')} variant="outline">
+            API Explorer
+          </Button>
+          <Button onClick={fetchData} variant="outline" size="icon">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
-        {syncStatuses.map((status) => (
-          <Card key={status.id}>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">{getSyncTypeLabel(status.sync_type)}</CardTitle>
-                <Badge variant={getStatusColor(status)}>
-                  {status.is_enabled ? 'Aktiv' : 'Inaktiv'}
-                </Badge>
-              </div>
-              <CardDescription>
-                {status.last_successful_sync 
-                  ? `Senaste synk: ${new Date(status.last_successful_sync).toLocaleString('sv-SE')}`
-                  : 'Ingen synkronisering än'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-muted-foreground">Synkade</p>
-                  <p className="text-2xl font-bold">{status.total_synced}</p>
+        <Card 
+          className="cursor-pointer hover:shadow-lg transition-shadow"
+          onClick={() => navigate('/integrations/inventory')}
+        >
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Package className="h-6 w-6 text-primary" />
                 </div>
-                <div>
-                  <p className="text-muted-foreground">Fel</p>
-                  <p className="text-2xl font-bold text-destructive">{status.total_errors}</p>
-                </div>
+                <CardTitle className="text-xl">Lagersaldo</CardTitle>
               </div>
-              {status.last_error && (
-                <p className="text-sm text-destructive">{status.last_error}</p>
-              )}
-              <Button 
-                onClick={() => triggerSync(status.sync_type)} 
-                disabled={syncing === status.sync_type}
-                className="w-full"
-              >
-                {syncing === status.sync_type ? 'Synkroniserar...' : 'Kör synk nu'}
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground text-sm mb-2">
+              Visa artiklar i lager med kvantiteter och status
+            </p>
+            <p className="text-2xl font-bold text-primary">
+              {syncStatuses.find(s => s.sync_type === 'inventory_export')?.total_synced || 0}
+            </p>
+            <p className="text-sm text-muted-foreground">artiklar i lager</p>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className="cursor-pointer hover:shadow-lg transition-shadow"
+          onClick={() => navigate('/integrations/articles')}
+        >
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-secondary/10">
+                  <List className="h-6 w-6 text-secondary" />
+                </div>
+                <CardTitle className="text-xl">Artiklar</CardTitle>
+              </div>
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground text-sm mb-2">
+              Hantera alla registrerade artiklar i systemet
+            </p>
+            <p className="text-2xl font-bold text-secondary">
+              {syncStatuses.find(s => s.sync_type === 'product_import')?.total_synced || 0}
+            </p>
+            <p className="text-sm text-muted-foreground">registrerade artiklar</p>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className="cursor-pointer hover:shadow-lg transition-shadow"
+          onClick={() => navigate('/integrations/sales')}
+        >
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-accent/10">
+                  <ShoppingCart className="h-6 w-6 text-accent" />
+                </div>
+                <CardTitle className="text-xl">Försäljning</CardTitle>
+              </div>
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground text-sm mb-2">
+              Visa aktiva ordrar och försäljningsstatus
+            </p>
+            <p className="text-2xl font-bold text-accent">
+              {syncStatuses.find(s => s.sync_type === 'sale_import')?.total_synced || 0}
+            </p>
+            <p className="text-sm text-muted-foreground">synkade ordrar</p>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
