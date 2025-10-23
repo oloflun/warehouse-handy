@@ -40,27 +40,19 @@ Deno.serve(async (req) => {
     const orders = Array.isArray(result.data) ? result.data : (result.data.orders || []);
     console.log(`📦 Found ${orders.length} orders to process`);
     
-    // Filter out only quotes/offers/drafts, include all paid orders (retail + e-commerce)
+    // Simplified status filtering - exclude only non-paid orders
+    const excludedTypes = ['quote', 'offer', 'draft'];
+    const excludedStatuses = ['cancelled', 'rejected', 'expired', 'deleted'];
+    
     const validOrders = orders.filter((order: any) => {
-      const status = order.status || order.orderStatus || '';
-      const orderType = order.type || order.orderType || '';
+      const orderType = (order.type || order.orderType || '').toLowerCase();
+      const orderStatus = (order.status || order.orderStatus || '').toLowerCase();
       
-      // Exclude only quotes/offers/drafts (unpaid orders)
-      if (orderType.toLowerCase().includes('quote') || 
-          orderType.toLowerCase().includes('offer') ||
-          orderType.toLowerCase().includes('draft')) {
-        return false;
-      }
+      // Exclude only quotes/offers and cancelled orders
+      const isExcludedType = excludedTypes.some(type => orderType.includes(type));
+      const isExcludedStatus = excludedStatuses.some(status => orderStatus.includes(status));
       
-      // Include all paid/confirmed orders from both retail POS and e-commerce
-      const validStatuses = [
-        'completed', 'delivered', 'closed', 'done',        // Retail POS
-        'paid', 'confirmed', 'processing', 'shipped',      // E-commerce from Sellus
-        'ready', 'fulfilled', 'invoiced'                   // Other possible statuses
-      ];
-      
-      const statusLower = status.toLowerCase();
-      return validStatuses.some(validStatus => statusLower.includes(validStatus));
+      return !isExcludedType && !isExcludedStatus;
     });
     
     console.log(`✅ ${validOrders.length} valid orders after filtering (excluded quotes/drafts)`);
@@ -73,6 +65,79 @@ Deno.serve(async (req) => {
         const orderId = order.id || order.orderId || order.orderNumber || 'unknown';
         const orderDate = order.date || order.orderDate || order.createdAt || order.created_at || new Date().toISOString();
         const storeName = order.storeName || order.store || order.location || 'Butik';
+        const customerName = order.customerName || order.customer || '';
+        const customerNotes = order.notes || order.customerNotes || order.comment || '';
+        
+        // Find or create location
+        let { data: location } = await supabaseClient
+          .from('locations')
+          .select('id')
+          .eq('name', storeName)
+          .maybeSingle();
+          
+        if (!location) {
+          const { data: newLocation, error: locError } = await supabaseClient
+            .from('locations')
+            .insert({ name: storeName })
+            .select()
+            .single();
+          
+          if (locError || !newLocation) {
+            console.error('❌ Failed to create location:', locError);
+            errorCount++;
+            continue;
+          }
+          location = newLocation;
+          console.log(`➕ Created new location: ${storeName}`);
+        }
+
+        if (!location) {
+          console.error('❌ Location is null after creation attempt');
+          errorCount++;
+          continue;
+        }
+
+        // Create or update order in database
+        const { data: existingOrder } = await supabaseClient
+          .from('orders')
+          .select('id')
+          .eq('fdt_order_id', orderId)
+          .maybeSingle();
+          
+        let dbOrder;
+        if (existingOrder) {
+          const { data } = await supabaseClient
+            .from('orders')
+            .update({
+              customer_notes: customerNotes,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingOrder.id)
+            .select()
+            .single();
+          dbOrder = data;
+        } else {
+          const { data } = await supabaseClient
+            .from('orders')
+            .insert({
+              fdt_order_id: orderId,
+              order_number: orderId,
+              customer_name: customerName,
+              customer_notes: customerNotes,
+              status: 'pending',
+              order_date: orderDate,
+              location_id: location.id
+            })
+            .select()
+            .single();
+          dbOrder = data;
+        }
+
+        if (!dbOrder) {
+          console.error('❌ Failed to create/update order');
+          errorCount++;
+          continue;
+        }
         
         // Handle orders with multiple line items
         const orderLines = order.lines || order.items || order.details || order.orderLines;
@@ -100,32 +165,28 @@ Deno.serve(async (req) => {
               continue;
             }
 
-            let { data: location } = await supabaseClient
-              .from('locations')
+            // Check if order line already exists
+            const { data: existingLine } = await supabaseClient
+              .from('order_lines')
               .select('id')
-              .eq('name', storeName)
+              .eq('order_id', dbOrder.id)
+              .eq('product_id', product.id)
               .maybeSingle();
-
-            if (!location) {
-              const { data: newLocation, error: locError } = await supabaseClient
-                .from('locations')
-                .insert({ name: storeName })
-                .select()
-                .single();
               
-              if (locError || !newLocation) {
-                console.error('❌ Failed to create location:', locError);
-                continue;
-              }
-              location = newLocation;
-              console.log(`➕ Created new location: ${storeName}`);
+            if (!existingLine) {
+              await supabaseClient
+                .from('order_lines')
+                .insert({
+                  order_id: dbOrder.id,
+                  product_id: product.id,
+                  fdt_article_id: articleId,
+                  quantity_ordered: quantity,
+                  quantity_picked: 0,
+                  is_picked: false
+                });
             }
 
-            if (!location) {
-              console.error('❌ Location is null after creation attempt');
-              continue;
-            }
-
+            // Create transaction for inventory tracking
             await supabaseClient.from('transactions').insert({
               product_id: product.id,
               location_id: location.id,
@@ -170,34 +231,28 @@ Deno.serve(async (req) => {
             continue;
           }
 
-          let { data: location } = await supabaseClient
-            .from('locations')
+          // Check if order line already exists
+          const { data: existingLine } = await supabaseClient
+            .from('order_lines')
             .select('id')
-            .eq('name', storeName)
+            .eq('order_id', dbOrder.id)
+            .eq('product_id', product.id)
             .maybeSingle();
-
-          if (!location) {
-            const { data: newLocation, error: locError } = await supabaseClient
-              .from('locations')
-              .insert({ name: storeName })
-              .select()
-              .single();
             
-            if (locError || !newLocation) {
-              console.error('❌ Failed to create location:', locError);
-              errorCount++;
-              continue;
-            }
-            location = newLocation;
-            console.log(`➕ Created new location: ${storeName}`);
+          if (!existingLine) {
+            await supabaseClient
+              .from('order_lines')
+              .insert({
+                order_id: dbOrder.id,
+                product_id: product.id,
+                fdt_article_id: articleId,
+                quantity_ordered: quantity,
+                quantity_picked: 0,
+                is_picked: false
+              });
           }
 
-          if (!location) {
-            console.error('❌ Location is null after creation attempt');
-            errorCount++;
-            continue;
-          }
-
+          // Create transaction for inventory tracking
           await supabaseClient.from('transactions').insert({
             product_id: product.id,
             location_id: location.id,

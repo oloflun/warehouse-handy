@@ -22,6 +22,9 @@ const Scanner = () => {
   const [notes, setNotes] = useState("");
   const [scanning, setScanning] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [activeOrders, setActiveOrders] = useState<any[]>([]);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [pickingMode, setPickingMode] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -85,12 +88,49 @@ const Scanner = () => {
       return;
     }
 
-    if (data) {
-      setProduct(data);
-      toast.success(`Produkt hittad: ${data.name}`);
-    } else {
+    if (!data) {
       toast.error("Produkt hittades inte");
       setProduct(null);
+      setActiveOrders([]);
+      return;
+    }
+
+    setProduct(data);
+    toast.success(`Produkt hittad: ${data.name}`);
+
+    // Find active orders with this product
+    const { data: ordersWithProduct } = await supabase
+      .from('order_lines')
+      .select(`
+        id,
+        order_id,
+        quantity_ordered,
+        quantity_picked,
+        is_picked,
+        orders!inner (
+          id,
+          fdt_order_id,
+          order_number,
+          customer_name,
+          customer_notes,
+          status,
+          order_date
+        )
+      `)
+      .eq('product_id', data.id)
+      .in('orders.status', ['pending', 'picking'])
+      .eq('is_picked', false);
+
+    if (ordersWithProduct && ordersWithProduct.length > 0) {
+      setActiveOrders(ordersWithProduct);
+      setPickingMode(true);
+      toast.info(`${ordersWithProduct.length} aktiva order hittade med denna artikel!`, {
+        duration: 4000,
+      });
+    } else {
+      setActiveOrders([]);
+      setPickingMode(false);
+      toast.info("Inga aktiva ordrar för denna artikel");
     }
   };
 
@@ -98,6 +138,79 @@ const Scanner = () => {
     if (manualCode) {
       handleScan(manualCode);
     }
+  };
+
+  const handlePickItem = async (orderLineId: string, orderId: string, quantityToPick: number) => {
+    if (!user || !product) return;
+    
+    const { error: lineError } = await supabase
+      .from('order_lines')
+      .update({
+        quantity_picked: quantityToPick,
+        is_picked: true,
+        picked_by: user.id,
+        picked_at: new Date().toISOString()
+      })
+      .eq('id', orderLineId);
+      
+    if (lineError) {
+      toast.error("Kunde inte bocka av artikel");
+      console.error("Error updating order line:", lineError);
+      return;
+    }
+    
+    await supabase.from('transactions').insert({
+      product_id: product.id,
+      location_id: selectedLocation || locations[0]?.id,
+      type: 'in',
+      quantity: quantityToPick,
+      user_id: user.id,
+      notes: `Plockning för order ${selectedOrder.order_number}`
+    });
+    
+    const { data: remainingLines } = await supabase
+      .from('order_lines')
+      .select('id')
+      .eq('order_id', orderId)
+      .eq('is_picked', false);
+      
+    if (!remainingLines || remainingLines.length === 0) {
+      await supabase
+        .from('orders')
+        .update({ 
+          status: 'ready',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+        
+      toast.success("✅ Order komplett! Markerad som redo.", {
+        duration: 5000,
+      });
+    } else {
+      toast.warning(`⚠️ Order ej komplett. ${remainingLines.length} artikel(er) kvar att plocka.`, {
+        duration: 5000,
+      });
+    }
+    
+    const { data: orderStatus } = await supabase
+      .from('orders')
+      .select('status')
+      .eq('id', orderId)
+      .single();
+      
+    if (orderStatus?.status === 'pending') {
+      await supabase
+        .from('orders')
+        .update({ status: 'picking' })
+        .eq('id', orderId);
+    }
+    
+    setProduct(null);
+    setActiveOrders([]);
+    setSelectedOrder(null);
+    setPickingMode(false);
+    setScannedCode("");
+    setManualCode("");
   };
 
   const handleTransaction = async () => {
@@ -218,6 +331,85 @@ const Scanner = () => {
                 </>
               )}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {pickingMode && activeOrders.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Välj order att plocka för</CardTitle>
+            <CardDescription>
+              {activeOrders.length} aktiv(a) order hittades med denna artikel
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {activeOrders.map((orderLine: any) => {
+              const order = orderLine.orders;
+              return (
+                <Card 
+                  key={orderLine.id}
+                  className={`cursor-pointer hover:bg-accent transition-colors ${
+                    selectedOrder?.id === order.id ? 'border-primary border-2' : ''
+                  }`}
+                  onClick={() => setSelectedOrder(order)}
+                >
+                  <CardContent className="p-4 space-y-2">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-bold text-lg">Order {order.order_number}</p>
+                        {order.customer_name && (
+                          <p className="text-sm text-muted-foreground">
+                            Kund: {order.customer_name}
+                          </p>
+                        )}
+                      </div>
+                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                        {order.status === 'pending' ? 'Väntande' : 'Plockas'}
+                      </span>
+                    </div>
+                    
+                    {order.customer_notes && (
+                      <div className="bg-yellow-50 p-2 rounded border border-yellow-200">
+                        <p className="text-sm font-medium text-yellow-900">
+                          📝 Godsmärke: {order.customer_notes}
+                        </p>
+                      </div>
+                    )}
+                    
+                    <div className="text-sm">
+                      <p>Antal att plocka: <span className="font-bold">{orderLine.quantity_ordered}</span></p>
+                      <p className="text-xs text-muted-foreground">
+                        Order datum: {new Date(order.order_date).toLocaleDateString('sv-SE')}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+            
+            {selectedOrder && (
+              <Button 
+                onClick={() => {
+                  const selectedLine = activeOrders.find((ol: any) => ol.orders.id === selectedOrder.id);
+                  handlePickItem(selectedLine.id, selectedOrder.id, selectedLine.quantity_ordered);
+                }}
+                className="w-full mt-4"
+                size="lg"
+              >
+                ✓ Bocka av artikel för order {selectedOrder.order_number}
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {!pickingMode && product && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Registrera Transaktion</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
 
             <div className="space-y-2">
               <Label>Typ av transaktion</Label>

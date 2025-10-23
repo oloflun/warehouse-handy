@@ -157,6 +157,114 @@ export type Database = {
         }
         Relationships: []
       }
+      order_lines: {
+        Row: {
+          created_at: string | null
+          fdt_article_id: string | null
+          id: string
+          is_picked: boolean | null
+          order_id: string | null
+          picked_at: string | null
+          picked_by: string | null
+          product_id: string | null
+          quantity_ordered: number
+          quantity_picked: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          fdt_article_id?: string | null
+          id?: string
+          is_picked?: boolean | null
+          order_id?: string | null
+          picked_at?: string | null
+          picked_by?: string | null
+          product_id?: string | null
+          quantity_ordered: number
+          quantity_picked?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          fdt_article_id?: string | null
+          id?: string
+          is_picked?: boolean | null
+          order_id?: string | null
+          picked_at?: string | null
+          picked_by?: string | null
+          product_id?: string | null
+          quantity_ordered?: number
+          quantity_picked?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_lines_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "order_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_lines_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_lines_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          created_at: string | null
+          customer_name: string | null
+          customer_notes: string | null
+          fdt_order_id: string
+          id: string
+          location_id: string | null
+          order_date: string | null
+          order_number: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          customer_name?: string | null
+          customer_notes?: string | null
+          fdt_order_id: string
+          id?: string
+          location_id?: string | null
+          order_date?: string | null
+          order_number?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          customer_name?: string | null
+          customer_notes?: string | null
+          fdt_order_id?: string
+          id?: string
+          location_id?: string | null
+          order_date?: string | null
+          order_number?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           barcode: string
@@ -252,7 +360,22 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      order_summary: {
+        Row: {
+          customer_name: string | null
+          customer_notes: string | null
+          fdt_order_id: string | null
+          id: string | null
+          location_name: string | null
+          order_date: string | null
+          order_number: string | null
+          pick_status: string | null
+          picked_lines: number | null
+          status: string | null
+          total_lines: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never
