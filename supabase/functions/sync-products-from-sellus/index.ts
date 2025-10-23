@@ -89,6 +89,31 @@ Deno.serve(async (req) => {
 
         if (!name) {
           console.warn(`⚠️ Skipping product ${articleId} without name`);
+          await logSync(supabaseClient, {
+            sync_type: 'product',
+            direction: 'sellus_to_wms',
+            fdt_article_id: articleId,
+            status: 'error',
+            error_message: 'Missing name',
+            request_payload: article,
+            duration_ms: 0,
+          });
+          errorCount++;
+          continue;
+        }
+
+        // Skip products without barcode (required by DB constraint)
+        if (!barcode) {
+          console.warn(`⚠️ Skipping product ${articleId} (${name}) - missing barcode`);
+          await logSync(supabaseClient, {
+            sync_type: 'product',
+            direction: 'sellus_to_wms',
+            fdt_article_id: articleId,
+            status: 'error',
+            error_message: 'Missing barcode (required field)',
+            request_payload: article,
+            duration_ms: 0,
+          });
           errorCount++;
           continue;
         }
@@ -110,15 +135,23 @@ Deno.serve(async (req) => {
         };
 
         if (existingProduct) {
-          await supabaseClient
+          const { error: updateError } = await supabaseClient
             .from('products')
             .update(productData)
             .eq('id', existingProduct.id);
+          
+          if (updateError) {
+            throw updateError;
+          }
           console.log(`✏️ Updated product: ${name} (${articleId})`);
         } else {
-          await supabaseClient
+          const { error: insertError } = await supabaseClient
             .from('products')
             .insert(productData);
+          
+          if (insertError) {
+            throw insertError;
+          }
           console.log(`➕ Created product: ${name} (${articleId})`);
         }
 
@@ -136,12 +169,13 @@ Deno.serve(async (req) => {
         console.error(`❌ Error syncing product:`, error);
         console.error('📦 Product data:', article);
         
+        const articleIdForLog = article.id || article.articleId || article.itemId || 'unknown';
         await logSync(supabaseClient, {
           sync_type: 'product',
           direction: 'sellus_to_wms',
-          fdt_article_id: article.id || 'unknown',
+          fdt_article_id: String(articleIdForLog),
           status: 'error',
-          error_message: error instanceof Error ? error.message : 'Unknown error',
+          error_message: error instanceof Error ? error.message : String(error),
           request_payload: article,
           duration_ms: 0,
         });
