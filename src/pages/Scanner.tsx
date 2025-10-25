@@ -268,27 +268,96 @@ const Scanner = () => {
       toast.success(`Produkt hittad: ${product.name}`);
       
       // Find active orders with this product
-      const { data: ordersWithProduct } = await supabase
-        .from('order_lines')
-        .select(`
-          id,
-          order_id,
-          quantity_ordered,
-          quantity_picked,
-          is_picked,
-          orders!inner (
+      // Bygg upp alla möjliga artikel-identifierare för denna produkt
+      const productIdentifiers = [
+        product.barcode,
+        product.fdt_sellus_article_id,
+        String(product.id)
+      ].filter(Boolean); // Ta bort null/undefined
+
+      // Sök ordrar på BÅDE product_id OCH fdt_article_id
+      const [directMatch, fdtMatch] = await Promise.all([
+        // 1. Direkt matchning via product_id (normal flöde)
+        supabase
+          .from('order_lines')
+          .select(`
             id,
-            fdt_order_id,
-            order_number,
-            customer_name,
-            customer_notes,
-            status,
-            order_date
+            order_id,
+            product_id,
+            quantity_ordered,
+            quantity_picked,
+            is_picked,
+            fdt_article_id,
+            orders!inner (
+              id,
+              fdt_order_id,
+              order_number,
+              customer_name,
+              customer_notes,
+              status,
+              order_date
+            )
+          `)
+          .eq('product_id', product.id)
+          .in('orders.status', ['pending', 'picking'])
+          .eq('is_picked', false),
+        
+        // 2. Fallback via fdt_article_id (för när product_id är NULL)
+        supabase
+          .from('order_lines')
+          .select(`
+            id,
+            order_id,
+            product_id,
+            quantity_ordered,
+            quantity_picked,
+            is_picked,
+            fdt_article_id,
+            orders!inner (
+              id,
+              fdt_order_id,
+              order_number,
+              customer_name,
+              customer_notes,
+              status,
+              order_date
+            )
+          `)
+          .is('product_id', null) // Endast rader där matchning misslyckades
+          .in('fdt_article_id', productIdentifiers) // Matcha mot alla identifierare
+          .in('orders.status', ['pending', 'picking'])
+          .eq('is_picked', false)
+      ]);
+
+      // Kombinera resultat och ta bort dubbletter
+      const allOrderLines = [
+        ...(directMatch.data || []),
+        ...(fdtMatch.data || [])
+      ];
+
+      // Filtrera bort dubbletter baserat på order_line id
+      const uniqueOrderLines = Array.from(
+        new Map(allOrderLines.map(ol => [ol.id, ol])).values()
+      );
+
+      // Om vi hittade ordrar via fdt_article_id, fixa product_id-kopplingen
+      const fdtMatchedLines = (fdtMatch.data || []).filter(ol => !ol.product_id);
+      if (fdtMatchedLines.length > 0) {
+        console.log(`🔧 Fixar ${fdtMatchedLines.length} orderrader med NULL product_id`);
+        
+        await Promise.all(
+          fdtMatchedLines.map(ol =>
+            supabase
+              .from('order_lines')
+              .update({ product_id: product.id })
+              .eq('id', ol.id)
           )
-        `)
-        .eq('product_id', product.id)
-        .in('orders.status', ['pending', 'picking'])
-        .eq('is_picked', false);
+        );
+        
+        toast.info(`Länkade ${fdtMatchedLines.length} orderrader till produkten`);
+      }
+
+      const ordersWithProduct = uniqueOrderLines;
       
       if (ordersWithProduct && ordersWithProduct.length > 0) {
         setActiveOrders(ordersWithProduct);
@@ -314,27 +383,95 @@ const Scanner = () => {
     toast.success(`Vald produkt: ${selectedProduct.name}`);
     
     // Find active orders
-    const { data: ordersWithProduct } = await supabase
-      .from('order_lines')
-      .select(`
-        id,
-        order_id,
-        quantity_ordered,
-        quantity_picked,
-        is_picked,
-        orders!inner (
+    // Bygg upp alla möjliga artikel-identifierare för denna produkt
+    const productIdentifiers = [
+      selectedProduct.barcode,
+      selectedProduct.fdt_sellus_article_id,
+      String(selectedProduct.id)
+    ].filter(Boolean);
+
+    // Sök ordrar på BÅDE product_id OCH fdt_article_id
+    const [directMatch, fdtMatch] = await Promise.all([
+      // 1. Direkt matchning via product_id
+      supabase
+        .from('order_lines')
+        .select(`
           id,
-          fdt_order_id,
-          order_number,
-          customer_name,
-          customer_notes,
-          status,
-          order_date
+          order_id,
+          product_id,
+          quantity_ordered,
+          quantity_picked,
+          is_picked,
+          fdt_article_id,
+          orders!inner (
+            id,
+            fdt_order_id,
+            order_number,
+            customer_name,
+            customer_notes,
+            status,
+            order_date
+          )
+        `)
+        .eq('product_id', selectedProduct.id)
+        .in('orders.status', ['pending', 'picking'])
+        .eq('is_picked', false),
+      
+      // 2. Fallback via fdt_article_id
+      supabase
+        .from('order_lines')
+        .select(`
+          id,
+          order_id,
+          product_id,
+          quantity_ordered,
+          quantity_picked,
+          is_picked,
+          fdt_article_id,
+          orders!inner (
+            id,
+            fdt_order_id,
+            order_number,
+            customer_name,
+            customer_notes,
+            status,
+            order_date
+          )
+        `)
+        .is('product_id', null)
+        .in('fdt_article_id', productIdentifiers)
+        .in('orders.status', ['pending', 'picking'])
+        .eq('is_picked', false)
+    ]);
+
+    // Kombinera resultat och ta bort dubbletter
+    const allOrderLines = [
+      ...(directMatch.data || []),
+      ...(fdtMatch.data || [])
+    ];
+
+    const uniqueOrderLines = Array.from(
+      new Map(allOrderLines.map(ol => [ol.id, ol])).values()
+    );
+
+    // Auto-fixa NULL product_id
+    const fdtMatchedLines = (fdtMatch.data || []).filter(ol => !ol.product_id);
+    if (fdtMatchedLines.length > 0) {
+      console.log(`🔧 Fixar ${fdtMatchedLines.length} orderrader med NULL product_id`);
+      
+      await Promise.all(
+        fdtMatchedLines.map(ol =>
+          supabase
+            .from('order_lines')
+            .update({ product_id: selectedProduct.id })
+            .eq('id', ol.id)
         )
-      `)
-      .eq('product_id', selectedProduct.id)
-      .in('orders.status', ['pending', 'picking'])
-      .eq('is_picked', false);
+      );
+      
+      toast.info(`Länkade ${fdtMatchedLines.length} orderrader till produkten`);
+    }
+
+    const ordersWithProduct = uniqueOrderLines;
     
     if (ordersWithProduct && ordersWithProduct.length > 0) {
       setActiveOrders(ordersWithProduct);
