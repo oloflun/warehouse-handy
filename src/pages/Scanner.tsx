@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Html5QrcodeScanner } from "html5-qrcode";
+import { useState, useEffect, useRef } from "react";
+import { Html5Qrcode } from "html5-qrcode";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,11 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Scan, Package, Plus, Minus, CloudUpload } from "lucide-react";
+import { Scan, Package, Plus, Minus, CloudUpload, Camera, RotateCcw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const Scanner = () => {
   const navigate = useNavigate();
+  const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
   const [scannedCode, setScannedCode] = useState("");
   const [manualCode, setManualCode] = useState("");
   const [product, setProduct] = useState<any>(null);
@@ -20,7 +21,7 @@ const Scanner = () => {
   const [quantity, setQuantity] = useState(1);
   const [transactionType, setTransactionType] = useState<"in" | "out">("in");
   const [notes, setNotes] = useState("");
-  const [scanning, setScanning] = useState(false);
+  const [cameraStarted, setCameraStarted] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [activeOrders, setActiveOrders] = useState<any[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
@@ -39,29 +40,16 @@ const Scanner = () => {
   }, [navigate]);
 
   useEffect(() => {
-    if (scanning) {
-      const scanner = new Html5QrcodeScanner(
-        "reader",
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        false
-      );
-
-      scanner.render(
-        (decodedText) => {
-          handleScan(decodedText);
-          scanner.clear();
-          setScanning(false);
-        },
-        (error) => {
-          console.log(error);
-        }
-      );
-
-      return () => {
-        scanner.clear().catch(console.error);
-      };
-    }
-  }, [scanning]);
+    // Initialize scanner once on mount
+    html5QrCodeRef.current = new Html5Qrcode("reader");
+    
+    return () => {
+      // Stop camera on unmount
+      if (html5QrCodeRef.current && cameraStarted) {
+        html5QrCodeRef.current.stop().catch(console.error);
+      }
+    };
+  }, []);
 
   const fetchLocations = async () => {
     const { data, error } = await supabase.from("locations").select("*");
@@ -73,6 +61,70 @@ const Scanner = () => {
     if (data && data.length > 0) {
       setSelectedLocation(data[0].id);
     }
+  };
+
+  const startScanning = async () => {
+    if (!html5QrCodeRef.current) return;
+    
+    try {
+      const cameras = await Html5Qrcode.getCameras();
+      
+      if (cameras.length === 0) {
+        toast.error("Ingen kamera hittades");
+        return;
+      }
+      
+      // Find back camera (environment facing)
+      const backCamera = cameras.find(camera => 
+        camera.label.toLowerCase().includes('back') || 
+        camera.label.toLowerCase().includes('rear') ||
+        camera.label.toLowerCase().includes('environment')
+      ) || cameras[cameras.length - 1]; // Fallback to last camera (often back camera)
+      
+      await html5QrCodeRef.current.start(
+        backCamera.id,
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0,
+        },
+        (decodedText) => {
+          handleScan(decodedText);
+          // Keep camera active for continuous scanning
+        },
+        () => {
+          // Ignore scan errors (happens continuously when no QR code is found)
+        }
+      );
+      
+      setCameraStarted(true);
+      toast.success("Kamera startad - redo att scanna");
+    } catch (err) {
+      console.error("Kunde inte starta kamera:", err);
+      toast.error("Kunde inte starta kameran");
+    }
+  };
+
+  const stopScanning = async () => {
+    if (!html5QrCodeRef.current || !cameraStarted) return;
+    
+    try {
+      await html5QrCodeRef.current.stop();
+      setCameraStarted(false);
+      toast.info("Kamera stoppad");
+    } catch (err) {
+      console.error("Kunde inte stoppa kamera:", err);
+    }
+  };
+
+  const resetScanner = () => {
+    setProduct(null);
+    setActiveOrders([]);
+    setSelectedOrder(null);
+    setPickingMode(false);
+    setScannedCode("");
+    setManualCode("");
+    // Camera stays active for next scan
   };
 
   const handleScan = async (code: string) => {
@@ -235,12 +287,7 @@ const Scanner = () => {
         .eq('id', orderId);
     }
     
-    setProduct(null);
-    setActiveOrders([]);
-    setSelectedOrder(null);
-    setPickingMode(false);
-    setScannedCode("");
-    setManualCode("");
+    resetScanner();
   };
 
   const handleTransaction = async () => {
@@ -297,9 +344,7 @@ const Scanner = () => {
       }
     }
 
-    setProduct(null);
-    setScannedCode("");
-    setManualCode("");
+    resetScanner();
     setQuantity(1);
     setNotes("");
   };
@@ -334,26 +379,33 @@ const Scanner = () => {
             <Button onClick={handleManualSearch}>Sök</Button>
           </div>
 
-          {!scanning ? (
+          <div id="reader" className="w-full"></div>
+          
+          {!cameraStarted ? (
             <Button
-              onClick={() => setScanning(true)}
+              onClick={startScanning}
               className="w-full"
-              variant="secondary"
+              variant="default"
+              size="lg"
             >
-              <Scan className="w-4 h-4 mr-2" />
-              Starta kamera
+              <Camera className="w-5 h-5 mr-2" />
+              Starta scanning
             </Button>
           ) : (
-            <>
-              <div id="reader" className="w-full"></div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-green-600 dark:text-green-500 font-medium justify-center p-2 bg-green-50 dark:bg-green-950/30 rounded-md">
+                <Camera className="w-5 h-5 animate-pulse" />
+                Kamera aktiv - scanna en produkt
+              </div>
               <Button
-                onClick={() => setScanning(false)}
-                className="w-full"
+                onClick={stopScanning}
                 variant="outline"
+                size="sm"
+                className="w-full"
               >
                 Stoppa kamera
               </Button>
-            </>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -361,11 +413,23 @@ const Scanner = () => {
       {product && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="w-5 h-5" />
-              {product.name}
-            </CardTitle>
-            <CardDescription>{product.description}</CardDescription>
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="w-5 h-5" />
+                  {product.name}
+                </CardTitle>
+                <CardDescription>{product.description}</CardDescription>
+              </div>
+              <Button
+                onClick={resetScanner}
+                variant="ghost"
+                size="sm"
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Scanna nästa
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4 text-sm">
