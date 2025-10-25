@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Scan, Package, Plus, Minus, CloudUpload, Camera, RotateCcw } from "lucide-react";
+import { Scan, Package, Plus, Minus, CloudUpload, Camera, RotateCcw, Sparkles } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 
 const Scanner = () => {
@@ -26,6 +27,13 @@ const Scanner = () => {
   const [activeOrders, setActiveOrders] = useState<any[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [pickingMode, setPickingMode] = useState(false);
+  
+  // AI scanning state
+  const [scanMode, setScanMode] = useState<"barcode" | "ai">("barcode");
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiResults, setAiResults] = useState<any>(null);
+  const [matchedProducts, setMatchedProducts] = useState<any[]>([]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -124,7 +132,215 @@ const Scanner = () => {
     setPickingMode(false);
     setScannedCode("");
     setManualCode("");
+    setCapturedImage(null);
+    setAiResults(null);
+    setMatchedProducts([]);
     // Camera stays active for next scan
+  };
+
+  const captureImage = async () => {
+    if (!html5QrCodeRef.current || !cameraStarted) {
+      toast.error("Kamera måste vara startad först");
+      return;
+    }
+    
+    try {
+      // Get video element from the reader
+      const videoElement = document.getElementById("reader")?.querySelector("video");
+      if (!videoElement) {
+        toast.error("Kunde inte hitta video-element");
+        return;
+      }
+      
+      // Create canvas and capture frame
+      const canvas = document.createElement("canvas");
+      canvas.width = videoElement.videoWidth;
+      canvas.height = videoElement.videoHeight;
+      const ctx = canvas.getContext("2d");
+      
+      if (!ctx) {
+        toast.error("Kunde inte skapa canvas");
+        return;
+      }
+      
+      ctx.drawImage(videoElement, 0, 0);
+      const imageBase64 = canvas.toDataURL("image/jpeg", 0.9);
+      setCapturedImage(imageBase64);
+      
+      // Analyze with AI
+      await analyzeLabel(imageBase64);
+    } catch (err) {
+      console.error("Kunde inte ta foto:", err);
+      toast.error("Kunde inte ta foto");
+    }
+  };
+
+  const analyzeLabel = async (imageBase64: string) => {
+    setIsAnalyzing(true);
+    toast.loading("Analyserar etikett med AI...", { id: "ai-analysis" });
+    
+    try {
+      const { data, error } = await supabase.functions.invoke("analyze-label", {
+        body: { image: imageBase64 }
+      });
+      
+      if (error) throw error;
+      
+      setAiResults(data);
+      
+      if (data.article_numbers.length === 0 && data.product_names.length === 0) {
+        toast.error("Kunde inte hitta några artikelnummer eller produktnamn", {
+          id: "ai-analysis"
+        });
+        return;
+      }
+      
+      toast.success(
+        `Hittade ${data.article_numbers.length} artikelnummer och ${data.product_names.length} produktnamn`,
+        { id: "ai-analysis" }
+      );
+      
+      // Auto-match against products
+      await matchProductsFromAI(data);
+      
+    } catch (err) {
+      console.error("AI-analys misslyckades:", err);
+      toast.error("Kunde inte analysera etikett", { id: "ai-analysis" });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const matchProductsFromAI = async (aiData: any) => {
+    const { article_numbers, product_names } = aiData;
+    
+    if (article_numbers.length === 0 && product_names.length === 0) {
+      toast.warning("Inga artikelnummer eller produktnamn att söka efter");
+      return;
+    }
+    
+    // Build search query for article numbers
+    let matchedProds: any[] = [];
+    
+    if (article_numbers.length > 0) {
+      const articleQueries = article_numbers.map((num: string) => 
+        `barcode.ilike.%${num}%,fdt_sellus_article_id.ilike.%${num}%,name.ilike.%${num}%`
+      ).join(",");
+      
+      const { data: articleMatches } = await supabase
+        .from("products")
+        .select("*")
+        .or(articleQueries);
+      
+      if (articleMatches && articleMatches.length > 0) {
+        matchedProds = articleMatches;
+      }
+    }
+    
+    // If no matches from article numbers, try product names
+    if (matchedProds.length === 0 && product_names.length > 0) {
+      const nameQueries = product_names.map((name: string) => 
+        `name.ilike.%${name}%`
+      ).join(",");
+      
+      const { data: nameMatches } = await supabase
+        .from("products")
+        .select("*")
+        .or(nameQueries);
+      
+      if (nameMatches && nameMatches.length > 0) {
+        matchedProds = nameMatches;
+      }
+    }
+    
+    if (matchedProds.length === 0) {
+      toast.warning("Kunde inte hitta några matchande produkter i systemet");
+      setMatchedProducts([]);
+      return;
+    }
+    
+    setMatchedProducts(matchedProds);
+    
+    // If only one product matched, auto-select it
+    if (matchedProds.length === 1) {
+      const product = matchedProds[0];
+      setProduct(product);
+      toast.success(`Produkt hittad: ${product.name}`);
+      
+      // Find active orders with this product
+      const { data: ordersWithProduct } = await supabase
+        .from('order_lines')
+        .select(`
+          id,
+          order_id,
+          quantity_ordered,
+          quantity_picked,
+          is_picked,
+          orders!inner (
+            id,
+            fdt_order_id,
+            order_number,
+            customer_name,
+            customer_notes,
+            status,
+            order_date
+          )
+        `)
+        .eq('product_id', product.id)
+        .in('orders.status', ['pending', 'picking'])
+        .eq('is_picked', false);
+      
+      if (ordersWithProduct && ordersWithProduct.length > 0) {
+        setActiveOrders(ordersWithProduct);
+        setPickingMode(true);
+        toast.info(`${ordersWithProduct.length} aktiva order hittade med denna artikel!`, {
+          duration: 4000,
+        });
+      } else {
+        setActiveOrders([]);
+        setPickingMode(false);
+        toast.info("Inga aktiva ordrar för denna artikel");
+      }
+    } else {
+      toast.info(`${matchedProds.length} matchande produkter hittade - välj en`, {
+        duration: 4000
+      });
+    }
+  };
+
+  const selectProductFromMatch = async (selectedProduct: any) => {
+    setProduct(selectedProduct);
+    setMatchedProducts([]);
+    toast.success(`Vald produkt: ${selectedProduct.name}`);
+    
+    // Find active orders
+    const { data: ordersWithProduct } = await supabase
+      .from('order_lines')
+      .select(`
+        id,
+        order_id,
+        quantity_ordered,
+        quantity_picked,
+        is_picked,
+        orders!inner (
+          id,
+          fdt_order_id,
+          order_number,
+          customer_name,
+          customer_notes,
+          status,
+          order_date
+        )
+      `)
+      .eq('product_id', selectedProduct.id)
+      .in('orders.status', ['pending', 'picking'])
+      .eq('is_picked', false);
+    
+    if (ordersWithProduct && ordersWithProduct.length > 0) {
+      setActiveOrders(ordersWithProduct);
+      setPickingMode(true);
+      toast.info(`${ordersWithProduct.length} aktiva order hittade!`);
+    }
   };
 
   const handleScan = async (code: string) => {
@@ -363,21 +579,45 @@ const Scanner = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Skanna streckkod</CardTitle>
+          <CardTitle>Skanning</CardTitle>
           <CardDescription>
-            Använd kameran eller ange streckkoden manuellt
+            Välj skanningsläge: streckkod eller AI-etikett
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Scan mode toggle */}
           <div className="flex gap-2">
-            <Input
-              placeholder="Ange streckkod manuellt"
-              value={manualCode}
-              onChange={(e) => setManualCode(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleManualSearch()}
-            />
-            <Button onClick={handleManualSearch}>Sök</Button>
+            <Button
+              variant={scanMode === "barcode" ? "default" : "outline"}
+              onClick={() => setScanMode("barcode")}
+              className="flex-1"
+            >
+              <Scan className="w-4 h-4 mr-2" />
+              Streckkod
+            </Button>
+            <Button
+              variant={scanMode === "ai" ? "default" : "outline"}
+              onClick={() => setScanMode("ai")}
+              className="flex-1"
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              AI-Etikett
+            </Button>
           </div>
+
+          {scanMode === "barcode" && (
+            <>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Ange streckkod manuellt"
+                  value={manualCode}
+                  onChange={(e) => setManualCode(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleManualSearch()}
+                />
+                <Button onClick={handleManualSearch}>Sök</Button>
+              </div>
+            </>
+          )}
 
           <div id="reader" className="w-full"></div>
           
@@ -389,14 +629,36 @@ const Scanner = () => {
               size="lg"
             >
               <Camera className="w-5 h-5 mr-2" />
-              Starta scanning
+              Starta kamera
             </Button>
           ) : (
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-green-600 dark:text-green-500 font-medium justify-center p-2 bg-green-50 dark:bg-green-950/30 rounded-md">
                 <Camera className="w-5 h-5 animate-pulse" />
-                Kamera aktiv - scanna en produkt
+                {scanMode === "barcode" ? "Scanna streckkod" : "Redo att ta foto av etikett"}
               </div>
+              
+              {scanMode === "ai" && (
+                <Button
+                  onClick={captureImage}
+                  disabled={isAnalyzing}
+                  className="w-full"
+                  size="lg"
+                >
+                  {isAnalyzing ? (
+                    <>
+                      <Sparkles className="w-5 h-5 mr-2 animate-spin" />
+                      Analyserar...
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="w-5 h-5 mr-2" />
+                      Ta foto av etikett
+                    </>
+                  )}
+                </Button>
+              )}
+              
               <Button
                 onClick={stopScanning}
                 variant="outline"
@@ -409,6 +671,84 @@ const Scanner = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* AI Results Display */}
+      {aiResults && (
+        <Card className="border-primary">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-primary" />
+              AI-Resultat
+            </CardTitle>
+            <CardDescription>
+              Konfidensgrad: <Badge variant={
+                aiResults.confidence === "high" ? "default" : 
+                aiResults.confidence === "medium" ? "secondary" : 
+                "outline"
+              }>{aiResults.confidence}</Badge>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {aiResults.article_numbers.length > 0 && (
+              <div>
+                <Label className="text-sm font-medium">Artikelnummer hittade:</Label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {aiResults.article_numbers.map((num: string, idx: number) => (
+                    <Badge key={idx} variant="default">
+                      {num}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {aiResults.product_names.length > 0 && (
+              <div>
+                <Label className="text-sm font-medium">Produktnamn hittade:</Label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {aiResults.product_names.map((name: string, idx: number) => (
+                    <Badge key={idx} variant="secondary">
+                      {name}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Multiple product matches */}
+      {matchedProducts.length > 1 && (
+        <Card className="border-blue-500">
+          <CardHeader>
+            <CardTitle>Välj produkt</CardTitle>
+            <CardDescription>
+              {matchedProducts.length} matchande produkter hittades
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {matchedProducts.map((prod) => (
+              <Button
+                key={prod.id}
+                variant="outline"
+                className="w-full justify-start h-auto py-3"
+                onClick={() => selectProductFromMatch(prod)}
+              >
+                <div className="flex flex-col items-start gap-1">
+                  <div className="flex items-center gap-2">
+                    <Package className="w-4 h-4" />
+                    <span className="font-semibold">{prod.name}</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {prod.barcode} {prod.fdt_sellus_article_id ? `• ${prod.fdt_sellus_article_id}` : ''}
+                  </span>
+                </div>
+              </Button>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {product && (
         <Card>

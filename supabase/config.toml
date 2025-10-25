@@ -1,1 +1,19 @@
 project_id = "qadtpwdokdfqtpvwwhsn"
+
+[functions.analyze-label]
+verify_jwt = true
+
+[functions.fdt-api-explorer]
+verify_jwt = false
+
+[functions.sync-inventory-to-sellus]
+verify_jwt = false
+
+[functions.sync-products-from-sellus]
+verify_jwt = false
+
+[functions.sync-sales-from-retail]
+verify_jwt = false
+
+[functions.update-sellus-stock]
+verify_jwt = false
