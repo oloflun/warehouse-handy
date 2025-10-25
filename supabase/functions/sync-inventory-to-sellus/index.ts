@@ -66,38 +66,52 @@ Deno.serve(async (req) => {
 
         console.log(`🔄 Syncing ${product.name} (${product.fdt_sellus_article_id}) - Quantity: ${item.quantity}`);
 
-        // First, try to get the existing item data from FDT
-        const getResult = await callFDTApi({
+        // Try to resolve numeric id and fetch existing item data
+        let targetId: string | number = product.fdt_sellus_article_id;
+        let existing: any = null;
+
+        let getResult = await callFDTApi({
           endpoint: `/items/${product.fdt_sellus_article_id}`,
           method: 'GET',
         });
 
-        let updateBody: any;
-
         if (getResult.success && getResult.data) {
-          // Update existing item with all fields preserved
-          console.log(`✅ Found existing item in FDT, updating quantity for Elon branch`);
-          updateBody = {
-            ...getResult.data,
-            branchId: 5, // Elon branch
-            quantity: item.quantity,
-            stock: item.quantity,
-            availableQuantity: item.quantity,
-          };
+          existing = getResult.data;
+          targetId = existing?.id ?? targetId;
+          console.log(`✅ Found existing item by id: ${targetId}`);
         } else {
-          // If GET fails, try POST with minimal data
-          console.log(`⚠️ Could not fetch existing item, attempting update with minimal data`);
-          updateBody = {
-            branchId: 5, // Elon branch
-            quantity: item.quantity,
-            stock: item.quantity,
-            availableQuantity: item.quantity,
-          };
+          console.warn(`⚠️ GET /items/${product.fdt_sellus_article_id} failed, listing to resolve numeric id`);
+          let list = await callFDTApi({ endpoint: `/items?branchId=5`, method: 'GET' });
+          if (!list.success || !list.data) {
+            console.warn('⚠️ /items?branchId=5 returned no data, trying /items/full');
+            list = await callFDTApi({ endpoint: `/items/full?branchId=5`, method: 'GET' });
+          }
+          const payload = list.data || {};
+          const items = Array.isArray(payload) ? payload : payload.results || payload.items || payload.data || [];
+          const found = items.find((it: any) => String(it.itemNumber) === String(product.fdt_sellus_article_id));
+          if (found) {
+            existing = found;
+            targetId = found.id ?? targetId;
+            console.log(`✅ Resolved numeric item id ${targetId} for itemNumber ${product.fdt_sellus_article_id}`);
+          }
         }
+
+        // Prepare safe update body (ensure accounting fields and stock flags)
+        const updateBody: any = {
+          ...(existing || {}),
+          branchId: 5,
+          vatId: existing?.vatId ?? 1,
+          salesAccount: existing?.salesAccount ?? 3001,
+          stockStatus: existing?.stockStatus ?? 'stockItem',
+          inventoryStatus: existing?.inventoryStatus ?? 'normal',
+          quantity: item.quantity,
+          stock: item.quantity,
+          availableQuantity: item.quantity,
+        };
 
         // Update item using POST /items/{id} endpoint
         const result = await callFDTApi({
-          endpoint: `/items/${product.fdt_sellus_article_id}`,
+          endpoint: `/items/${targetId}`,
           method: 'POST',
           body: updateBody,
         });

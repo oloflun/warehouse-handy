@@ -77,47 +77,60 @@ Deno.serve(async (req) => {
 
     console.log(`📊 Total stock for ${product.name}: ${totalStock} (across all locations)`);
 
-    // Fetch existing item data from FDT
+    // Fetch existing item data from FDT, resolving numeric id when needed
     console.log(`🔍 Fetching existing data for article ${product.fdt_sellus_article_id}`);
+    let existingData: any = null;
+    let targetId: string | number = product.fdt_sellus_article_id; // fallback
+
+    // 1) Try direct GET using provided id (may be numeric or itemNumber)
     const existingDataResponse = await callFDTApi({
       endpoint: `/items/${product.fdt_sellus_article_id}`,
       method: 'GET',
     });
 
-    if (!existingDataResponse.success) {
-      console.error('Failed to fetch existing FDT data:', existingDataResponse.error);
-      await logSync(supabaseClient, {
-        sync_type: 'inventory_item',
-        direction: 'wms_to_fdt',
-        fdt_article_id: product.fdt_sellus_article_id,
-        wms_product_id: productId,
-        status: 'error',
-        error_message: `Failed to fetch existing data: ${existingDataResponse.error}`,
-        duration_ms: Date.now() - startTime,
-      });
-
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Failed to fetch existing FDT data',
-          details: existingDataResponse.error 
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (existingDataResponse.success) {
+      existingData = existingDataResponse.data;
+      targetId = existingData?.id ?? targetId;
+    } else {
+      console.warn(`⚠️ GET /items/${product.fdt_sellus_article_id} failed, trying list lookup by itemNumber`);
+      // 2) Fallback: list items for branch and try to match itemNumber
+      let lookup = await callFDTApi({ endpoint: `/items?branchId=5`, method: 'GET' });
+      if (!lookup.success || !lookup.data) {
+        console.warn('⚠️ /items?branchId=5 returned no data, trying /items/full');
+        lookup = await callFDTApi({ endpoint: `/items/full?branchId=5`, method: 'GET' });
+      }
+      const listPayload = lookup.data || {};
+      const items = Array.isArray(listPayload) ? listPayload : listPayload.results || listPayload.items || listPayload.data || [];
+      const found = items.find((it: any) => String(it.itemNumber) === String(product.fdt_sellus_article_id));
+      if (found) {
+        existingData = found;
+        targetId = found.id ?? targetId;
+        console.log(`✅ Resolved numeric item id ${targetId} for itemNumber ${product.fdt_sellus_article_id}`);
+      } else {
+        console.warn(`⚠️ Could not resolve item by itemNumber=${product.fdt_sellus_article_id}`);
+      }
     }
 
-    const existingData = existingDataResponse.data;
-
-    // Update stock in FDT Sellus
-    const updatePayload = {
-      ...existingData,
+    // Build safe update payload
+    const updatePayload: any = {
+      ...(existingData || {}),
+      // Ensure required accounting fields exist (fallbacks based on FDT defaults)
+      vatId: existingData?.vatId ?? 1,
+      salesAccount: existingData?.salesAccount ?? 3001,
+      // Stock-related fields
       stock: totalStock,
+      quantity: totalStock,
+      availableQuantity: totalStock,
+      // Make sure item is treated as a stocked item
+      stockStatus: existingData?.stockStatus ?? 'stockItem',
+      inventoryStatus: existingData?.inventoryStatus ?? 'normal',
+      branchId: 5,
     };
 
-    console.log(`📤 Updating FDT article ${product.fdt_sellus_article_id} with stock: ${totalStock}`);
+    console.log(`📤 Updating FDT article ${targetId} with stock: ${totalStock}`);
 
     const updateResponse = await callFDTApi({
-      endpoint: `/items/${product.fdt_sellus_article_id}`,
+      endpoint: `/items/${targetId}`,
       method: 'POST',
       body: updatePayload,
     });
