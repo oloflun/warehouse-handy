@@ -158,10 +158,14 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        // Använd itemNumber som primär ID (t.ex. "1201" istället för FDT's interna ID)
+        const primaryArticleId = articleNumber || String(articleId);
+        
+        // Sök på BÅDE fdt_sellus_article_id OCH barcode för att hitta befintlig produkt
         const { data: existingProduct } = await supabaseClient
           .from('products')
-          .select('id')
-          .eq('fdt_sellus_article_id', articleId)
+          .select('id, fdt_sellus_article_id, barcode')
+          .or(`fdt_sellus_article_id.eq.${primaryArticleId},barcode.eq.${barcode || articleNumber},barcode.eq.${articleNumber || barcode}`)
           .maybeSingle();
 
         const productData = {
@@ -171,9 +175,11 @@ Deno.serve(async (req) => {
           description,
           min_stock: minStock,
           unit,
-          fdt_sellus_article_id: articleNumber || articleId, // Prefer itemNumber (e.g. "1201") over internal ID
+          fdt_sellus_article_id: primaryArticleId,
           purchase_price: purchasePrice,
           sales_price: salesPrice,
+          fdt_sync_status: 'synced',
+          fdt_last_synced: new Date().toISOString(),
         };
 
         if (existingProduct) {
@@ -183,31 +189,66 @@ Deno.serve(async (req) => {
             .eq('id', existingProduct.id);
           
           if (updateError) {
-            throw updateError;
+            console.error(`❌ Error updating product:`, updateError);
+            // Lägg ändå till i syncedArticleIds - produkten finns i FDT även om update misslyckades
+            syncedArticleIds.push(primaryArticleId);
+            
+            await logSync(supabaseClient, {
+              sync_type: 'product',
+              direction: 'sellus_to_wms',
+              fdt_article_id: primaryArticleId,
+              status: 'error',
+              error_message: updateError.message,
+              request_payload: article,
+              duration_ms: 0,
+            });
+            
+            errorCount++;
+            continue;
           }
-          console.log(`✏️ Updated product: ${name} (${articleId})`);
+          console.log(`✏️ Updated product: ${name} (${primaryArticleId})`);
         } else {
           const { error: insertError } = await supabaseClient
             .from('products')
             .insert(productData);
           
           if (insertError) {
-            throw insertError;
+            console.error(`❌ Error inserting product:`, insertError);
+            
+            // VIKTIGT: Om det är duplicate key error, lägg ändå till i syncedArticleIds
+            // eftersom produkten FINNS i FDT (även om vi inte kunde skapa/uppdatera den)
+            if (insertError.code === '23505') {
+              console.warn(`⚠️ Product already exists (duplicate key), adding to synced list anyway: ${primaryArticleId}`);
+              syncedArticleIds.push(primaryArticleId);
+            }
+            
+            await logSync(supabaseClient, {
+              sync_type: 'product',
+              direction: 'sellus_to_wms',
+              fdt_article_id: primaryArticleId,
+              status: 'error',
+              error_message: insertError.message,
+              request_payload: article,
+              duration_ms: 0,
+            });
+            
+            errorCount++;
+            continue;
           }
-          console.log(`➕ Created product: ${name} (${articleId})`);
+          console.log(`➕ Created product: ${name} (${primaryArticleId})`);
         }
 
         await logSync(supabaseClient, {
           sync_type: 'product',
           direction: 'sellus_to_wms',
-          fdt_article_id: articleId,
+          fdt_article_id: primaryArticleId,
           status: 'success',
           response_payload: article,
           duration_ms: result.duration,
         });
 
         syncedCount++;
-        syncedArticleIds.push(articleId);
+        syncedArticleIds.push(primaryArticleId);
       } catch (error) {
         console.error(`❌ Error syncing product:`, error);
         console.error('📦 Product data:', article);
@@ -239,19 +280,44 @@ Deno.serve(async (req) => {
 
     console.log(`✅ Product sync completed: ${syncedCount} synced, ${errorCount} errors`);
 
-    // Step 3: Clean up products not in "1200- Elon" group
-    console.log('🧹 Cleaning up products outside varugrupp 1200...');
+    // VIKTIGT: Om för många fel uppstod, hoppa över cleanup för att undvika dataförlust
+    if (errorCount > syncedCount && errorCount > 2) {
+      console.warn(`⚠️ Too many errors (${errorCount} errors vs ${syncedCount} synced)`);
+      console.warn(`⚠️ Skipping cleanup to prevent data loss`);
+      
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: `Sync completed with too many errors (${errorCount}), cleanup skipped`,
+          synced: syncedCount,
+          errors: errorCount,
+          cleanupSkipped: true
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Step 3: Rensa endast produkter som verkligen inte finns i FDT längre
+    console.log('🧹 Cleaning up products that are no longer in FDT varugrupp 1200...');
     let deletedCount = 0;
     let inactivatedCount = 0;
 
     if (syncedArticleIds.length > 0) {
+      // Hämta produkter som:
+      // 1. Har fdt_sellus_article_id satt (dvs är synkade från FDT)
+      // 2. INTE finns i listan över artiklar vi just synkade från FDT
+      // 3. Inte redan är inaktiva
       const { data: productsToRemove } = await supabaseClient
         .from('products')
-        .select('id, name, fdt_sellus_article_id, barcode')
-        .not('fdt_sellus_article_id', 'in', `(${syncedArticleIds.join(',')})`);
+        .select('id, name, fdt_sellus_article_id, barcode, fdt_sync_status')
+        .not('fdt_sellus_article_id', 'is', null) // Endast FDT-produkter
+        .not('fdt_sellus_article_id', 'in', `(${syncedArticleIds.join(',')})`)
+        .neq('fdt_sync_status', 'inactive'); // Hoppa över redan inaktiverade
 
       if (productsToRemove && productsToRemove.length > 0) {
-        console.log(`🧹 Found ${productsToRemove.length} products outside varugrupp 1200`);
+        console.log(`🧹 Found ${productsToRemove.length} products not in current FDT sync`);
+        console.log(`📋 Synced article IDs: ${syncedArticleIds.join(', ')}`);
+        console.log(`📋 Products to review:`, productsToRemove.map(p => `${p.fdt_sellus_article_id}:${p.name}`).join(', '));
 
         for (const product of productsToRemove) {
           // Check if product has inventory or order lines
@@ -268,7 +334,7 @@ Deno.serve(async (req) => {
               .eq('id', product.id);
 
             inactivatedCount++;
-            console.log(`⚠️ Inactivated: ${product.barcode || product.name} (in use)`);
+            console.log(`⚠️ Inactivated: ${product.fdt_sellus_article_id} (${product.name}) - in use`);
           } else {
             // Product not in use - delete
             await supabaseClient
@@ -277,12 +343,16 @@ Deno.serve(async (req) => {
               .eq('id', product.id);
 
             deletedCount++;
-            console.log(`🗑️ Deleted: ${product.barcode || product.name}`);
+            console.log(`🗑️ Deleted: ${product.fdt_sellus_article_id} (${product.name}) - not in use`);
           }
         }
 
         console.log(`✅ Cleanup done: ${deletedCount} deleted, ${inactivatedCount} inactivated`);
+      } else {
+        console.log('✅ No products to clean up - all FDT products are in sync');
       }
+    } else {
+      console.log('⚠️ No products were synced, skipping cleanup');
     }
 
     return new Response(
