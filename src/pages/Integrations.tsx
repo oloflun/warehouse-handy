@@ -36,7 +36,7 @@ const Integrations = () => {
   const [syncStatuses, setSyncStatuses] = useState<SyncStatus[]>([]);
   const [syncLogs, setSyncLogs] = useState<SyncLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState<Record<string, boolean>>({});
   const [user, setUser] = useState<any>(null);
 
   const { data: syncFailures, refetch: refetchFailures } = useQuery({
@@ -77,7 +77,7 @@ const Integrations = () => {
   };
 
   const triggerSync = async (syncType: string) => {
-    setSyncing(syncType);
+    setSyncing(prev => ({ ...prev, [syncType]: true }));
     try {
       const functionMap: Record<string, string> = {
         'product_import': 'sync-products-from-sellus',
@@ -131,7 +131,75 @@ const Integrations = () => {
       
       console.error('Sync error details:', error);
     } finally {
-      setSyncing(null);
+      setSyncing(prev => ({ ...prev, [syncType]: false }));
+    }
+  };
+
+  const retryFailedSync = async (failure: any) => {
+    if (!failure.product_id) {
+      toast({
+        title: "Fel",
+        description: "Ingen produkt-ID hittades för att försöka igen",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSyncing(prev => ({ ...prev, [`retry-${failure.id}`]: true }));
+    try {
+      const { data, error } = await supabase.functions.invoke('update-sellus-stock', {
+        body: {
+          productId: failure.product_id,
+          quantity: failure.quantity_changed,
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Försök igen lyckades",
+        description: `Lagersaldo för ${failure.product_name} har uppdaterats i Sellus`,
+      });
+
+      // Refresh data
+      setTimeout(() => {
+        fetchData();
+        refetchFailures();
+      }, 1000);
+    } catch (error: any) {
+      toast({
+        title: "Försök igen misslyckades",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSyncing(prev => ({ ...prev, [`retry-${failure.id}`]: false }));
+    }
+  };
+
+  const resolveAllItemIds = async () => {
+    setSyncing(prev => ({ ...prev, 'resolve-ids': true }));
+    try {
+      const { data, error } = await supabase.functions.invoke('resolve-sellus-item-ids', {
+        body: {}
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Verifiering slutförd",
+        description: `${data.resolved} artiklar verifierade, ${data.failed} misslyckades`,
+      });
+
+      setTimeout(fetchData, 1000);
+    } catch (error: any) {
+      toast({
+        title: "Fel vid verifiering",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSyncing(prev => ({ ...prev, 'resolve-ids': false }));
     }
   };
 
@@ -169,6 +237,13 @@ const Integrations = () => {
           </div>
         </div>
         <div className="flex gap-2">
+          <Button 
+            onClick={resolveAllItemIds}
+            disabled={syncing['resolve-ids']}
+            variant="secondary"
+          >
+            {syncing['resolve-ids'] ? 'Verifierar...' : 'Verifiera artikelkopplingar'}
+          </Button>
           <Button onClick={() => navigate('/fdt-explorer')} variant="outline">
             API Explorer
           </Button>
@@ -283,36 +358,46 @@ const Integrations = () => {
                       Fel: {failure.error_message}
                     </p>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={async () => {
-                      const { error } = await supabase
-                        .from('sellus_sync_failures')
-                        .update({ 
-                          resolved_at: new Date().toISOString(),
-                          resolved_by: user?.id 
-                        })
-                        .eq('id', failure.id);
-                      
-                      if (error) {
-                        toast({
-                          title: "Fel",
-                          description: "Kunde inte markera som löst",
-                          variant: "destructive",
-                        });
-                      } else {
-                        toast({
-                          title: "Markerad som löst",
-                          description: "Synkfelet har markerats som åtgärdat",
-                        });
-                        refetchFailures();
-                      }
-                    }}
-                  >
-                    <Check className="w-4 h-4 mr-2" />
-                    Markera som löst
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() => retryFailedSync(failure)}
+                      disabled={syncing[`retry-${failure.id}`]}
+                    >
+                      {syncing[`retry-${failure.id}`] ? 'Försöker...' : 'Försök igen'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={async () => {
+                        const { error } = await supabase
+                          .from('sellus_sync_failures')
+                          .update({ 
+                            resolved_at: new Date().toISOString(),
+                            resolved_by: user?.id 
+                          })
+                          .eq('id', failure.id);
+                        
+                        if (error) {
+                          toast({
+                            title: "Fel",
+                            description: "Kunde inte markera som löst",
+                            variant: "destructive",
+                          });
+                        } else {
+                          toast({
+                            title: "Markerad som löst",
+                            description: "Synkfelet har markerats som åtgärdat",
+                          });
+                          refetchFailures();
+                        }
+                      }}
+                    >
+                      <Check className="w-4 h-4 mr-2" />
+                      Markera som löst
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>

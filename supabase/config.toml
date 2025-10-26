@@ -6,6 +6,9 @@ verify_jwt = true
 [functions.fdt-api-explorer]
 verify_jwt = false
 
+[functions.resolve-sellus-item-ids]
+verify_jwt = false
+
 [functions.sync-inventory-to-sellus]
 verify_jwt = false
 

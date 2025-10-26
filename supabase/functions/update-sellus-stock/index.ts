@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
     // Fetch product details
     const { data: product, error: productError } = await supabaseClient
       .from('products')
-      .select('id, name, barcode, fdt_sellus_article_id')
+      .select('id, name, barcode, fdt_sellus_article_id, fdt_sellus_item_numeric_id')
       .eq('id', productId)
       .single();
 
@@ -77,63 +77,171 @@ Deno.serve(async (req) => {
 
     console.log(`📊 Total stock for ${product.name}: ${totalStock} (across all locations)`);
 
-    // Fetch existing item data from FDT, resolving numeric id when needed
-    console.log(`🔍 Fetching existing data for article ${product.fdt_sellus_article_id}`);
-    let existingData: any = null;
-    let targetId: string | number = product.fdt_sellus_article_id; // fallback
+    // Step 1: Try to use cached numeric ID if available
+    let resolvedNumericId: string | number | null = product.fdt_sellus_item_numeric_id;
+    let itemNumber = product.fdt_sellus_article_id;
 
-    // 1) Try direct GET using provided id (may be numeric or itemNumber)
-    const existingDataResponse = await callFDTApi({
-      endpoint: `/items/${product.fdt_sellus_article_id}`,
-      method: 'GET',
-    });
-
-    if (existingDataResponse.success) {
-      existingData = existingDataResponse.data;
-      targetId = existingData?.id ?? targetId;
-    } else {
-      console.warn(`⚠️ GET /items/${product.fdt_sellus_article_id} failed, trying list lookup by itemNumber`);
-      // 2) Fallback: list items for branch and try to match itemNumber
-      let lookup = await callFDTApi({ endpoint: `/items?branchId=5`, method: 'GET' });
-      if (!lookup.success || !lookup.data) {
-        console.warn('⚠️ /items?branchId=5 returned no data, trying /items/full');
-        lookup = await callFDTApi({ endpoint: `/items/full?branchId=5`, method: 'GET' });
+    if (!resolvedNumericId) {
+      console.log(`🔍 No cached numeric ID, resolving for article ${product.fdt_sellus_article_id}`);
+      
+      // Step 2: Try direct GET if the article_id looks numeric
+      const articleIdStr = String(product.fdt_sellus_article_id);
+      const isNumeric = /^\d+$/.test(articleIdStr);
+      
+      if (isNumeric) {
+        console.log(`🔢 Trying direct GET /items/${articleIdStr} (numeric ID)`);
+        const directResponse = await callFDTApi({
+          endpoint: `/items/${articleIdStr}`,
+          method: 'GET',
+        });
+        
+        if (directResponse.success && directResponse.data?.id) {
+          resolvedNumericId = directResponse.data.id;
+          itemNumber = directResponse.data.itemNumber || itemNumber;
+          console.log(`✅ Direct GET succeeded: numeric ID = ${resolvedNumericId}, itemNumber = ${itemNumber}`);
+        } else {
+          console.log(`⚠️ Direct GET failed: ${directResponse.error || 'No data returned'}`);
+        }
       }
-      const listPayload = lookup.data || {};
-      const items = Array.isArray(listPayload) ? listPayload : listPayload.results || listPayload.items || listPayload.data || [];
-      const found = items.find((it: any) => String(it.itemNumber) === String(product.fdt_sellus_article_id));
-      if (found) {
-        existingData = found;
-        targetId = found.id ?? targetId;
-        console.log(`✅ Resolved numeric item id ${targetId} for itemNumber ${product.fdt_sellus_article_id}`);
+
+      // Step 3: If still not resolved, search by itemNumber (branch-independent)
+      if (!resolvedNumericId) {
+        console.log(`🔍 Searching by itemNumber=${product.fdt_sellus_article_id} (branch-independent)`);
+        
+        // Try various endpoints to find the item
+        const searchEndpoints = [
+          `/items?itemNumber=${product.fdt_sellus_article_id}`,
+          `/items/full?itemNumber=${product.fdt_sellus_article_id}`,
+        ];
+
+        // If FDT_SELLUS_BRANCH_ID is configured, also try with branch filter
+        const branchId = Deno.env.get('FDT_SELLUS_BRANCH_ID');
+        if (branchId) {
+          searchEndpoints.push(`/items?branchId=${branchId}&itemNumber=${product.fdt_sellus_article_id}`);
+          searchEndpoints.push(`/items/full?branchId=${branchId}&itemNumber=${product.fdt_sellus_article_id}`);
+        }
+
+        for (const endpoint of searchEndpoints) {
+          console.log(`🔎 Trying: ${endpoint}`);
+          const searchResponse = await callFDTApi({ endpoint, method: 'GET' });
+          
+          if (searchResponse.success && searchResponse.data) {
+            const payload = searchResponse.data;
+            const items = Array.isArray(payload) ? payload : 
+                         payload.results || payload.items || payload.data || [];
+            
+            const found = items.find((it: any) => 
+              String(it.itemNumber) === String(product.fdt_sellus_article_id)
+            );
+            
+            if (found) {
+              resolvedNumericId = found.id;
+              itemNumber = found.itemNumber || itemNumber;
+              console.log(`✅ Found via ${endpoint}: numeric ID = ${resolvedNumericId}, itemNumber = ${itemNumber}`);
+              break;
+            }
+          }
+        }
+
+        // Step 4: Last resort - fetch all items and search in code
+        if (!resolvedNumericId) {
+          console.log(`🔍 Last resort: fetching all items and searching in code`);
+          const endpoints = branchId 
+            ? [`/items?branchId=${branchId}`, `/items/full?branchId=${branchId}`]
+            : ['/items', '/items/full'];
+
+          for (const endpoint of endpoints) {
+            console.log(`📥 Fetching: ${endpoint}`);
+            const allItemsResponse = await callFDTApi({ endpoint, method: 'GET' });
+            
+            if (allItemsResponse.success && allItemsResponse.data) {
+              const payload = allItemsResponse.data;
+              const items = Array.isArray(payload) ? payload : 
+                           payload.results || payload.items || payload.data || [];
+              
+              const found = items.find((it: any) => 
+                String(it.itemNumber) === String(product.fdt_sellus_article_id)
+              );
+              
+              if (found) {
+                resolvedNumericId = found.id;
+                itemNumber = found.itemNumber || itemNumber;
+                console.log(`✅ Found in full list: numeric ID = ${resolvedNumericId}, itemNumber = ${itemNumber}`);
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      // Step 5: Cache the resolved numeric ID for future use
+      if (resolvedNumericId) {
+        console.log(`💾 Caching numeric ID ${resolvedNumericId} for product ${product.id}`);
+        await supabaseClient
+          .from('products')
+          .update({ fdt_sellus_item_numeric_id: String(resolvedNumericId) })
+          .eq('id', product.id);
       } else {
-        console.warn(`⚠️ Could not resolve item by itemNumber=${product.fdt_sellus_article_id}`);
+        console.error(`❌ Could not resolve numeric ID for itemNumber=${product.fdt_sellus_article_id}`);
+        
+        const duration = Date.now() - startTime;
+        await logSync(supabaseClient, {
+          sync_type: 'inventory_item',
+          direction: 'wms_to_fdt',
+          fdt_article_id: product.fdt_sellus_article_id,
+          wms_product_id: productId,
+          status: 'error',
+          error_message: `Could not resolve Sellus item ID for itemNumber ${product.fdt_sellus_article_id}`,
+          request_payload: { stock: totalStock },
+          duration_ms: duration,
+        });
+
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: `Could not find item in Sellus with itemNumber ${product.fdt_sellus_article_id}`,
+            details: 'Item may not exist in Sellus or may be in a different branch'
+          }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
+    } else {
+      console.log(`✨ Using cached numeric ID: ${resolvedNumericId}`);
     }
 
-    // Build safe update payload
-    const updatePayload: any = {
-      ...(existingData || {}),
-      // Ensure required accounting fields exist (fallbacks based on FDT defaults)
-      vatId: existingData?.vatId ?? 1,
-      salesAccount: existingData?.salesAccount ?? 3001,
-      // Stock-related fields
+    // Step 6: Update stock in Sellus with minimal payload
+    console.log(`📤 Updating Sellus item ${resolvedNumericId} (itemNumber: ${itemNumber}) with stock: ${totalStock}`);
+
+    const minimalPayload: any = {
+      id: resolvedNumericId,
+      itemNumber: itemNumber,
       stock: totalStock,
       quantity: totalStock,
       availableQuantity: totalStock,
-      // Make sure item is treated as a stocked item
-      stockStatus: existingData?.stockStatus ?? 'stockItem',
-      inventoryStatus: existingData?.inventoryStatus ?? 'normal',
-      branchId: 5,
     };
 
-    console.log(`📤 Updating FDT article ${targetId} with stock: ${totalStock}`);
+    // Add branchId if configured
+    const branchId = Deno.env.get('FDT_SELLUS_BRANCH_ID');
+    if (branchId) {
+      minimalPayload.branchId = parseInt(branchId);
+    }
 
-    const updateResponse = await callFDTApi({
-      endpoint: `/items/${targetId}`,
+    // Try POST first, fallback to PUT if needed
+    let updateResponse = await callFDTApi({
+      endpoint: `/items/${resolvedNumericId}`,
       method: 'POST',
-      body: updatePayload,
+      body: minimalPayload,
     });
+
+    // If POST fails with method error, try PUT
+    if (!updateResponse.success && (updateResponse.error?.includes('405') || updateResponse.error?.includes('Method'))) {
+      console.log(`⚠️ POST failed, trying PUT method`);
+      updateResponse = await callFDTApi({
+        endpoint: `/items/${resolvedNumericId}`,
+        method: 'PUT',
+        body: minimalPayload,
+      });
+    }
 
     const duration = Date.now() - startTime;
 
@@ -146,7 +254,7 @@ Deno.serve(async (req) => {
         fdt_article_id: product.fdt_sellus_article_id,
         wms_product_id: productId,
         status: 'success',
-        request_payload: { stock: totalStock },
+        request_payload: { stock: totalStock, resolvedNumericId, itemNumber },
         response_payload: updateResponse.data,
         duration_ms: duration,
       });
@@ -157,6 +265,8 @@ Deno.serve(async (req) => {
           message: 'Stock updated in Sellus',
           product: product.name,
           newStock: totalStock,
+          resolvedNumericId,
+          itemNumber,
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -170,7 +280,7 @@ Deno.serve(async (req) => {
         wms_product_id: productId,
         status: 'error',
         error_message: updateResponse.error,
-        request_payload: { stock: totalStock },
+        request_payload: { stock: totalStock, resolvedNumericId, itemNumber },
         duration_ms: duration,
       });
 

@@ -630,7 +630,7 @@ const Scanner = () => {
     await supabase.from('transactions').insert({
       product_id: product.id,
       location_id: selectedLocation || locations[0]?.id,
-      type: 'in',
+      type: 'out',
       quantity: quantityToPick,
       user_id: user.id,
       notes: `Plockning för order ${selectedOrder.order_number}`
