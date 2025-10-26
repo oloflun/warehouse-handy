@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { Scan, Package, Plus, Minus, CloudUpload, Camera, RotateCcw, Sparkles } from "lucide-react";
+import { Scan, Package, Plus, Minus, CloudUpload, Camera, RotateCcw, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 
@@ -434,13 +434,9 @@ const Scanner = () => {
       if (ordersWithProduct && ordersWithProduct.length > 0) {
         setActiveOrders(ordersWithProduct);
         setPickingMode(true);
-        toast.info(`${ordersWithProduct.length} aktiva order hittade med denna artikel!`, {
-          duration: 4000,
-        });
       } else {
         setActiveOrders([]);
         setPickingMode(false);
-        toast.info("Inga aktiva ordrar för denna artikel");
       }
     } else {
       toast.info(`${matchedProds.length} matchande produkter hittade - välj en`, {
@@ -548,7 +544,6 @@ const Scanner = () => {
     if (ordersWithProduct && ordersWithProduct.length > 0) {
       setActiveOrders(ordersWithProduct);
       setPickingMode(true);
-      toast.info(`${ordersWithProduct.length} aktiva order hittade!`);
     }
   };
 
@@ -601,13 +596,9 @@ const Scanner = () => {
     if (ordersWithProduct && ordersWithProduct.length > 0) {
       setActiveOrders(ordersWithProduct);
       setPickingMode(true);
-      toast.info(`${ordersWithProduct.length} aktiva order hittade med denna artikel!`, {
-        duration: 4000,
-      });
     } else {
       setActiveOrders([]);
       setPickingMode(false);
-      toast.info("Inga aktiva ordrar för denna artikel");
     }
   };
 
@@ -788,12 +779,6 @@ const Scanner = () => {
 
       {!product ? (
         <Card>
-          <CardHeader>
-            <CardTitle>AI Scanner</CardTitle>
-            <CardDescription>
-              Scanna produktetiketter med AI
-            </CardDescription>
-          </CardHeader>
         <CardContent className="space-y-4">
           {!cameraStarted && (
             <div className="text-center py-8">
@@ -814,7 +799,7 @@ const Scanner = () => {
               >
                 {isAnalyzing ? (
                   <>
-                    <Sparkles className="w-5 h-5 mr-2 animate-pulse" />
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                     Analyserar...
                   </>
                 ) : (
@@ -824,14 +809,6 @@ const Scanner = () => {
                   </>
                 )}
               </Button>
-              
-              {isAnalyzing && (
-                <div className="text-center py-2">
-                  <p className="text-sm text-muted-foreground">
-                    AI läser av artikelnummer och produktnamn
-                  </p>
-                </div>
-              )}
               
               <Button
                 onClick={stopScanning}
