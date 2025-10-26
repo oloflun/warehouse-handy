@@ -115,16 +115,8 @@ const Scanner = () => {
       
       setCameraStarted(true);
       
-      // In AI mode, start automatic photo capture
       if (scanMode === "ai") {
-        const interval = setInterval(() => {
-          if (!product) {
-            captureImage();
-          }
-        }, 1000); // Scanna varje sekund
-        
-        setAutoScanInterval(interval);
-        toast.info("Automatisk scanning aktiverad - håll etiketten framför kameran");
+        toast.success("Kamera startad - tryck på knappen för att ta foto");
       } else {
         toast.success("Kamera startad - redo att scanna");
       }
@@ -824,25 +816,43 @@ const Scanner = () => {
               </Button>
             ) : scanMode === "ai" ? (
               <div className="space-y-3">
-                <div className="flex flex-col items-center gap-3 p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 rounded-lg border-2 border-dashed border-primary/30">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-6 h-6 text-primary animate-pulse" />
-                    <span className="font-semibold text-primary">
-                      {isAnalyzing ? "Analyserar etikett..." : "Håll etiketten stilla"}
-                    </span>
+                {/* Stor centrerad foto-knapp */}
+                <div className="flex flex-col items-center gap-4 py-8">
+                  <Button
+                    onClick={captureImage}
+                    disabled={isAnalyzing}
+                    size="lg"
+                    className="h-32 w-32 rounded-full bg-primary hover:bg-primary/90 shadow-2xl relative overflow-hidden disabled:opacity-50"
+                  >
+                    <div className="absolute inset-0 bg-primary-foreground/20 animate-pulse" />
+                    <div className="relative flex flex-col items-center gap-2">
+                      <Camera className="w-12 h-12 text-primary-foreground" />
+                      <span className="text-lg font-bold text-primary-foreground">
+                        {isAnalyzing ? "..." : "TA FOTO"}
+                      </span>
+                    </div>
+                  </Button>
+                  
+                  <div className="text-center space-y-1">
+                    {isAnalyzing ? (
+                      <>
+                        <div className="flex items-center justify-center gap-2">
+                          <Sparkles className="w-5 h-5 text-primary animate-pulse" />
+                          <span className="font-semibold text-primary">Analyserar etikett...</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          AI läser av artikelnummer och produktnamn
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-medium text-foreground">Centrera etiketten</p>
+                        <p className="text-sm text-muted-foreground">
+                          Tryck på knappen när du är redo
+                        </p>
+                      </>
+                    )}
                   </div>
-                  
-                  {isAnalyzing && (
-                    <div className="text-sm text-muted-foreground">
-                      AI läser av artikelnummer och produktnamn
-                    </div>
-                  )}
-                  
-                  {!isAnalyzing && (
-                    <div className="text-sm text-muted-foreground text-center">
-                      Håll etiketten framför kameran så scannar AI automatiskt
-                    </div>
-                  )}
                 </div>
                 
                 <Button
@@ -851,7 +861,7 @@ const Scanner = () => {
                   size="sm"
                   className="w-full"
                 >
-                  Stoppa automatisk scanning
+                  Stoppa kamera
                 </Button>
               </div>
             ) : (
