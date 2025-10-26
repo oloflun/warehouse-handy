@@ -99,7 +99,7 @@ const Scanner = () => {
       await html5QrCodeRef.current.start(
         backCamera.id,
         {
-          fps: 10,
+          fps: 30, // Högre FPS ger skarpare bilder när etiketten rör sig
           qrbox: { width: 250, height: 250 },
           aspectRatio: 1.0,
         },
@@ -118,10 +118,10 @@ const Scanner = () => {
       // In AI mode, start automatic photo capture
       if (scanMode === "ai") {
         const interval = setInterval(() => {
-          if (!isAnalyzing && !product) {
+          if (!product) {
             captureImage();
           }
-        }, 2000);
+        }, 1000); // Scanna varje sekund
         
         setAutoScanInterval(interval);
         toast.info("Automatisk scanning aktiverad - håll etiketten framför kameran");
@@ -198,7 +198,9 @@ const Scanner = () => {
       }
       
       ctx.drawImage(videoElement, 0, 0);
-      const imageBase64 = canvas.toDataURL("image/jpeg", 0.9);
+      // Använd högre kompression för snabbare uppladdning (0.8 istället för 0.9)
+      // Edge function är flaskhalsen, inte AI-modellen
+      const imageBase64 = canvas.toDataURL("image/jpeg", 0.8);
       setCapturedImage(imageBase64);
       
       // Analyze with AI
@@ -210,13 +212,25 @@ const Scanner = () => {
   };
 
   const analyzeLabel = async (imageBase64: string) => {
+    // Skippa om redan en analys är i gång MED samma bild
+    if (isAnalyzing) {
+      return;
+    }
+    
     setIsAnalyzing(true);
     toast.loading("Analyserar etikett med AI...", { id: "ai-analysis" });
     
     try {
-      const { data, error } = await supabase.functions.invoke("analyze-label", {
+      // Timeout på 8 sekunder för edge function
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("AI-analys timeout")), 8000)
+      );
+      
+      const analysisPromise = supabase.functions.invoke("analyze-label", {
         body: { image: imageBase64 }
       });
+      
+      const { data, error } = await Promise.race([analysisPromise, timeoutPromise]) as any;
       
       if (error) throw error;
       
