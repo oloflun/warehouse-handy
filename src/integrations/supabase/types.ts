@@ -303,6 +303,7 @@ export type Database = {
           description: string | null
           fdt_last_synced: string | null
           fdt_sellus_article_id: string | null
+          fdt_sellus_item_numeric_id: string | null
           fdt_sync_status: string | null
           id: string
           min_stock: number | null
@@ -319,6 +320,7 @@ export type Database = {
           description?: string | null
           fdt_last_synced?: string | null
           fdt_sellus_article_id?: string | null
+          fdt_sellus_item_numeric_id?: string | null
           fdt_sync_status?: string | null
           id?: string
           min_stock?: number | null
@@ -335,6 +337,7 @@ export type Database = {
           description?: string | null
           fdt_last_synced?: string | null
           fdt_sellus_article_id?: string | null
+          fdt_sellus_item_numeric_id?: string | null
           fdt_sync_status?: string | null
           id?: string
           min_stock?: number | null
