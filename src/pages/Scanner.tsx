@@ -653,10 +653,29 @@ const Scanner = () => {
       
       if (syncError || !syncResult?.success) {
         console.error("Sellus sync error:", syncError || syncResult?.error);
-        toast.error("⚠️ Artikel plockad men misslyckades synka till Sellus", {
-          id: "sellus-sync",
-          duration: 5000,
+        
+        // Log failure to database for persistent tracking
+        await supabase.from('sellus_sync_failures').insert({
+          product_id: product.id,
+          product_name: product.name,
+          fdt_sellus_article_id: product.fdt_sellus_article_id,
+          quantity_changed: -quantityToPick,
+          error_message: syncError?.message || syncResult?.error || 'Unknown error',
+          order_number: selectedOrder.order_number
         });
+        
+        toast.error(
+          `⚠️ KRITISKT FEL: Lagersaldo ej synkat till Sellus!\n\n` +
+          `Produkt: ${product.name}\n` +
+          `Plockat: ${quantityToPick} st\n` +
+          `Order: ${selectedOrder.order_number}\n` +
+          `Sellus Artikel-ID: ${product.fdt_sellus_article_id || 'Saknas'}\n\n` +
+          `UPPDATERA MANUELLT I SELLUS OMEDELBART!`,
+          {
+            id: "sellus-sync",
+            duration: 20000,
+          }
+        );
       } else if (!syncResult?.skipped) {
         toast.success("✅ Artikel plockad och synkad till Sellus", {
           id: "sellus-sync",

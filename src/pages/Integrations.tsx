@@ -4,9 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCw, ArrowLeft, CheckCircle2, XCircle, Clock, Package, List, ShoppingCart, ChevronRight } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { RefreshCw, ArrowLeft, CheckCircle2, XCircle, Clock, Package, List, ShoppingCart, ChevronRight, AlertCircle, Check } from "lucide-react";
 
 interface SyncStatus {
   id: string;
@@ -35,8 +37,26 @@ const Integrations = () => {
   const [syncLogs, setSyncLogs] = useState<SyncLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState<string | null>(null);
+  const [user, setUser] = useState<any>(null);
+
+  const { data: syncFailures, refetch: refetchFailures } = useQuery({
+    queryKey: ['sellus-sync-failures'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('sellus_sync_failures')
+        .select('*')
+        .is('resolved_at', null)
+        .order('created_at', { ascending: false });
+      return data || [];
+    },
+    refetchInterval: 30000,
+    enabled: !!user,
+  });
 
   useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user || null);
+    });
     fetchData();
   }, []);
 
@@ -237,6 +257,68 @@ const Integrations = () => {
           </CardContent>
         </Card>
       </div>
+
+      {syncFailures && syncFailures.length > 0 && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-5 w-5" />
+          <AlertTitle className="text-lg font-bold">
+            Misslyckade Sellus-synkningar
+          </AlertTitle>
+          <AlertDescription className="mt-2">
+            <p className="mb-3">
+              Följande produkter har plockats men kunde inte synkas till Sellus. Uppdatera manuellt i Sellus och markera som löst:
+            </p>
+            <div className="space-y-2">
+              {syncFailures.map((failure: any) => (
+                <div key={failure.id} className="flex items-center justify-between p-3 bg-background rounded border">
+                  <div className="flex-1">
+                    <p className="font-medium">{failure.product_name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Ändring: {failure.quantity_changed} st • 
+                      Order: {failure.order_number || 'N/A'} • 
+                      Sellus-ID: {failure.fdt_sellus_article_id || 'Saknas'} • 
+                      {new Date(failure.created_at).toLocaleString('sv-SE')}
+                    </p>
+                    <p className="text-sm text-destructive mt-1">
+                      Fel: {failure.error_message}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      const { error } = await supabase
+                        .from('sellus_sync_failures')
+                        .update({ 
+                          resolved_at: new Date().toISOString(),
+                          resolved_by: user?.id 
+                        })
+                        .eq('id', failure.id);
+                      
+                      if (error) {
+                        toast({
+                          title: "Fel",
+                          description: "Kunde inte markera som löst",
+                          variant: "destructive",
+                        });
+                      } else {
+                        toast({
+                          title: "Markerad som löst",
+                          description: "Synkfelet har markerats som åtgärdat",
+                        });
+                        refetchFailures();
+                      }
+                    }}
+                  >
+                    <Check className="w-4 h-4 mr-2" />
+                    Markera som löst
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Card>
         <CardHeader>

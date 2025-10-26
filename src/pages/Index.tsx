@@ -4,7 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
 import {
   Package,
   Scan,
@@ -13,6 +15,7 @@ import {
   LogOut,
   AlertTriangle,
   CheckCircle,
+  AlertCircle,
 } from "lucide-react";
 
 interface InventoryItem {
@@ -39,6 +42,20 @@ const Index = () => {
     totalProducts: 0,
     lowStock: 0,
     recentTransactions: 0,
+  });
+
+  const { data: syncFailures } = useQuery({
+    queryKey: ['sellus-sync-failures'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('sellus_sync_failures')
+        .select('*')
+        .is('resolved_at', null)
+        .order('created_at', { ascending: false });
+      return data || [];
+    },
+    refetchInterval: 30000,
+    enabled: !!user,
   });
 
   useEffect(() => {
@@ -143,6 +160,39 @@ const Index = () => {
           Logga ut
         </Button>
       </div>
+
+      {syncFailures && syncFailures.length > 0 && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-5 w-5" />
+          <AlertTitle className="text-lg font-bold">
+            ⚠️ {syncFailures.length} artikel{syncFailures.length > 1 ? 'ar' : ''} misslyckades synka till Sellus!
+          </AlertTitle>
+          <AlertDescription className="mt-2">
+            <p className="mb-3">
+              Följande produkter har plockats men lagersaldot har inte uppdaterats i Sellus.
+              Du måste uppdatera dessa MANUELLT:
+            </p>
+            <ul className="list-disc pl-5 space-y-1">
+              {syncFailures.map((failure: any) => (
+                <li key={failure.id}>
+                  <strong>{failure.product_name}</strong> - 
+                  Ändring: {failure.quantity_changed} st - 
+                  Order: {failure.order_number || 'N/A'} - 
+                  {new Date(failure.created_at).toLocaleString('sv-SE')}
+                </li>
+              ))}
+            </ul>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="mt-3"
+              onClick={() => navigate('/integrations')}
+            >
+              Visa detaljer och markera som löst
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>

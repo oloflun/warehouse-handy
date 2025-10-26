@@ -346,6 +346,53 @@ export type Database = {
         }
         Relationships: []
       }
+      sellus_sync_failures: {
+        Row: {
+          created_at: string | null
+          error_message: string
+          fdt_sellus_article_id: string | null
+          id: string
+          order_number: string | null
+          product_id: string | null
+          product_name: string
+          quantity_changed: number
+          resolved_at: string | null
+          resolved_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_message: string
+          fdt_sellus_article_id?: string | null
+          id?: string
+          order_number?: string | null
+          product_id?: string | null
+          product_name: string
+          quantity_changed: number
+          resolved_at?: string | null
+          resolved_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string
+          fdt_sellus_article_id?: string | null
+          id?: string
+          order_number?: string | null
+          product_id?: string | null
+          product_name?: string
+          quantity_changed?: number
+          resolved_at?: string | null
+          resolved_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sellus_sync_failures_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transactions: {
         Row: {
           created_at: string | null
