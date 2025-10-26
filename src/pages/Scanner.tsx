@@ -59,9 +59,18 @@ const Scanner = () => {
         clearInterval(autoScanInterval);
       }
       
-      // Stop camera on unmount
-      if (html5QrCodeRef.current && cameraStarted) {
-        html5QrCodeRef.current.stop().catch(console.error);
+      // Stop camera on unmount - check if scanner is actually running first
+      if (html5QrCodeRef.current) {
+        try {
+          const state = html5QrCodeRef.current.getState();
+          // Only stop if scanner is in SCANNING or PAUSED state
+          if (state === 2 || state === 3) { // 2 = SCANNING, 3 = PAUSED
+            html5QrCodeRef.current.stop().catch(console.error);
+          }
+        } catch (e) {
+          // Ignore errors during cleanup
+          console.log("Scanner cleanup skipped:", e);
+        }
       }
     };
   }, []);
@@ -127,7 +136,7 @@ const Scanner = () => {
   };
 
   const stopScanning = async () => {
-    if (!html5QrCodeRef.current || !cameraStarted) return;
+    if (!html5QrCodeRef.current) return;
     
     try {
       // Stop automatic scanning
@@ -136,11 +145,22 @@ const Scanner = () => {
         setAutoScanInterval(null);
       }
       
-      await html5QrCodeRef.current.stop();
-      setCameraStarted(false);
-      toast.info("Kamera stoppad");
+      // Check if scanner is actually running before trying to stop it
+      const state = html5QrCodeRef.current.getState();
+      // State 2 = SCANNING, State 3 = PAUSED
+      if (state === 2 || state === 3) {
+        await html5QrCodeRef.current.stop();
+        setCameraStarted(false);
+        toast.info("Kamera stoppad");
+      } else {
+        // Scanner already stopped, just update state
+        setCameraStarted(false);
+        toast.info("Kamera redan stoppad");
+      }
     } catch (err) {
       console.error("Kunde inte stoppa kamera:", err);
+      // Reset state anyway
+      setCameraStarted(false);
     }
   };
 
