@@ -75,6 +75,13 @@ const Scanner = () => {
     };
   }, []);
 
+  // Auto-start camera when component mounts and user is authenticated
+  useEffect(() => {
+    if (user && !cameraStarted) {
+      startScanning();
+    }
+  }, [user]);
+
   const fetchLocations = async () => {
     const { data, error } = await supabase.from("locations").select("*");
     if (error) {
@@ -787,58 +794,55 @@ const Scanner = () => {
               Scanna produktetiketter med AI
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div id="reader" className="w-full"></div>
-            
-            {!cameraStarted ? (
+        <CardContent className="space-y-4">
+          {!cameraStarted && (
+            <div className="text-center py-8">
+              <Camera className="w-12 h-12 mx-auto mb-3 text-primary animate-pulse" />
+              <p className="text-muted-foreground">Startar kamera...</p>
+            </div>
+          )}
+          
+          <div id="reader" className="w-full"></div>
+          
+          {cameraStarted && (
+            <div className="space-y-3">
               <Button
-                onClick={startScanning}
-                className="w-full"
-                variant="default"
+                onClick={captureImage}
+                disabled={isAnalyzing}
                 size="lg"
+                className="w-full h-14 bg-primary hover:bg-primary/90 disabled:opacity-50"
               >
-                <Camera className="w-5 h-5 mr-2" />
-                Starta kamera
-              </Button>
-            ) : (
-              <div className="space-y-3">
-                <Button
-                  onClick={captureImage}
-                  disabled={isAnalyzing}
-                  size="lg"
-                  className="w-full h-14 bg-primary hover:bg-primary/90 disabled:opacity-50"
-                >
-                  {isAnalyzing ? (
-                    <>
-                      <Sparkles className="w-5 h-5 mr-2 animate-pulse" />
-                      Analyserar...
-                    </>
-                  ) : (
-                    <>
-                      <Camera className="w-5 h-5 mr-2" />
-                      Scanna
-                    </>
-                  )}
-                </Button>
-                
-                {isAnalyzing && (
-                  <div className="text-center py-2">
-                    <p className="text-sm text-muted-foreground">
-                      AI läser av artikelnummer och produktnamn
-                    </p>
-                  </div>
+                {isAnalyzing ? (
+                  <>
+                    <Sparkles className="w-5 h-5 mr-2 animate-pulse" />
+                    Analyserar...
+                  </>
+                ) : (
+                  <>
+                    <Camera className="w-5 h-5 mr-2" />
+                    Scanna
+                  </>
                 )}
-                
-                <Button
-                  onClick={stopScanning}
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                >
-                  Stoppa kamera
-                </Button>
-              </div>
-            )}
+              </Button>
+              
+              {isAnalyzing && (
+                <div className="text-center py-2">
+                  <p className="text-sm text-muted-foreground">
+                    AI läser av artikelnummer och produktnamn
+                  </p>
+                </div>
+              )}
+              
+              <Button
+                onClick={stopScanning}
+                variant="outline"
+                size="sm"
+                className="w-full"
+              >
+                Stoppa kamera
+              </Button>
+            </div>
+          )}
             
             {/* Barcode mode (hidden by default) */}
             {scanMode === "barcode" && cameraStarted && (
