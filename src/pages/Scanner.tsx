@@ -35,6 +35,7 @@ const Scanner = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiResults, setAiResults] = useState<any>(null);
   const [matchedProducts, setMatchedProducts] = useState<any[]>([]);
+  const [autoScanInterval, setAutoScanInterval] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -53,6 +54,11 @@ const Scanner = () => {
     html5QrCodeRef.current = new Html5Qrcode("reader");
     
     return () => {
+      // Stop automatic scanning
+      if (autoScanInterval) {
+        clearInterval(autoScanInterval);
+      }
+      
       // Stop camera on unmount
       if (html5QrCodeRef.current && cameraStarted) {
         html5QrCodeRef.current.stop().catch(console.error);
@@ -98,8 +104,9 @@ const Scanner = () => {
           aspectRatio: 1.0,
         },
         (decodedText) => {
-          handleScan(decodedText);
-          // Keep camera active for continuous scanning
+          if (scanMode === "barcode") {
+            handleScan(decodedText);
+          }
         },
         () => {
           // Ignore scan errors (happens continuously when no QR code is found)
@@ -107,7 +114,20 @@ const Scanner = () => {
       );
       
       setCameraStarted(true);
-      toast.success("Kamera startad - redo att scanna");
+      
+      // In AI mode, start automatic photo capture
+      if (scanMode === "ai") {
+        const interval = setInterval(() => {
+          if (!isAnalyzing && !product) {
+            captureImage();
+          }
+        }, 2000);
+        
+        setAutoScanInterval(interval);
+        toast.info("Automatisk scanning aktiverad - håll etiketten framför kameran");
+      } else {
+        toast.success("Kamera startad - redo att scanna");
+      }
     } catch (err) {
       console.error("Kunde inte starta kamera:", err);
       toast.error("Kunde inte starta kameran");
@@ -118,6 +138,12 @@ const Scanner = () => {
     if (!html5QrCodeRef.current || !cameraStarted) return;
     
     try {
+      // Stop automatic scanning
+      if (autoScanInterval) {
+        clearInterval(autoScanInterval);
+        setAutoScanInterval(null);
+      }
+      
       await html5QrCodeRef.current.stop();
       setCameraStarted(false);
       toast.info("Kamera stoppad");
@@ -127,6 +153,12 @@ const Scanner = () => {
   };
 
   const resetScanner = () => {
+    // Stop automatic scanning
+    if (autoScanInterval) {
+      clearInterval(autoScanInterval);
+      setAutoScanInterval(null);
+    }
+    
     setProduct(null);
     setActiveOrders([]);
     setSelectedOrder(null);
@@ -136,6 +168,7 @@ const Scanner = () => {
     setCapturedImage(null);
     setAiResults(null);
     setMatchedProducts([]);
+    setIsAnalyzing(false);
     // Camera stays active for next scan
   };
 
@@ -196,10 +229,8 @@ const Scanner = () => {
         return;
       }
       
-      toast.success(
-        `Hittade ${data.article_numbers.length} artikelnummer och ${data.product_names.length} produktnamn`,
-        { id: "ai-analysis" }
-      );
+      toast.dismiss("ai-analysis");
+      console.log(`✅ AI hittade ${data.article_numbers.length} artikelnummer och ${data.product_names.length} produktnamn`);
       
       // Auto-match against products
       await matchProductsFromAI(data);
@@ -265,6 +296,13 @@ const Scanner = () => {
     // If only one product matched, auto-select it
     if (matchedProds.length === 1) {
       const product = matchedProds[0];
+      
+      // Stop automatic scanning when product is found
+      if (autoScanInterval) {
+        clearInterval(autoScanInterval);
+        setAutoScanInterval(null);
+      }
+      
       setProduct(product);
       toast.success(`Produkt hittad: ${product.name}`);
       
@@ -770,33 +808,28 @@ const Scanner = () => {
                 <Camera className="w-5 h-5 mr-2" />
                 Starta kamera
               </Button>
-            ) : (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-green-600 dark:text-green-500 font-medium justify-center p-2 bg-green-50 dark:bg-green-950/30 rounded-md">
-                  <Camera className="w-5 h-5 animate-pulse" />
-                  {scanMode === "barcode" ? "Scanna streckkod" : "Redo att ta foto av etikett"}
+            ) : scanMode === "ai" ? (
+              <div className="space-y-3">
+                <div className="flex flex-col items-center gap-3 p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 rounded-lg border-2 border-dashed border-primary/30">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-6 h-6 text-primary animate-pulse" />
+                    <span className="font-semibold text-primary">
+                      {isAnalyzing ? "Analyserar etikett..." : "Håll etiketten stilla"}
+                    </span>
+                  </div>
+                  
+                  {isAnalyzing && (
+                    <div className="text-sm text-muted-foreground">
+                      AI läser av artikelnummer och produktnamn
+                    </div>
+                  )}
+                  
+                  {!isAnalyzing && (
+                    <div className="text-sm text-muted-foreground text-center">
+                      Håll etiketten framför kameran så scannar AI automatiskt
+                    </div>
+                  )}
                 </div>
-                
-                {scanMode === "ai" && (
-                  <Button
-                    onClick={captureImage}
-                    disabled={isAnalyzing}
-                    className="w-full"
-                    size="lg"
-                  >
-                    {isAnalyzing ? (
-                      <>
-                        <Sparkles className="w-5 h-5 mr-2 animate-spin" />
-                        Analyserar...
-                      </>
-                    ) : (
-                      <>
-                        <Camera className="w-5 h-5 mr-2" />
-                        Ta foto av etikett
-                      </>
-                    )}
-                  </Button>
-                )}
                 
                 <Button
                   onClick={stopScanning}
@@ -804,6 +837,16 @@ const Scanner = () => {
                   size="sm"
                   className="w-full"
                 >
+                  Stoppa automatisk scanning
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-green-600 dark:text-green-500 font-medium justify-center p-2 bg-green-50 dark:bg-green-950/30 rounded-md">
+                  <Camera className="w-5 h-5 animate-pulse" />
+                  Scanna streckkod
+                </div>
+                <Button onClick={stopScanning} variant="outline" size="sm" className="w-full">
                   Stoppa kamera
                 </Button>
               </div>
@@ -823,51 +866,6 @@ const Scanner = () => {
         </div>
       )}
 
-      {/* AI Results Display */}
-      {aiResults && !product && (
-        <Card className="border-primary">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-primary" />
-              AI-Resultat
-            </CardTitle>
-            <CardDescription>
-              Konfidensgrad: <Badge variant={
-                aiResults.confidence === "high" ? "default" : 
-                aiResults.confidence === "medium" ? "secondary" : 
-                "outline"
-              }>{aiResults.confidence}</Badge>
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {aiResults.article_numbers.length > 0 && (
-              <div>
-                <Label className="text-sm font-medium">Artikelnummer hittade:</Label>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {aiResults.article_numbers.map((num: string, idx: number) => (
-                    <Badge key={idx} variant="default">
-                      {num}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {aiResults.product_names.length > 0 && (
-              <div>
-                <Label className="text-sm font-medium">Produktnamn hittade:</Label>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {aiResults.product_names.map((name: string, idx: number) => (
-                    <Badge key={idx} variant="secondary">
-                      {name}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {/* Multiple product matches */}
       {matchedProducts.length > 1 && (
