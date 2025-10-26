@@ -30,7 +30,7 @@ const Scanner = () => {
   const [pickingMode, setPickingMode] = useState(false);
   
   // AI scanning state
-  const [scanMode, setScanMode] = useState<"barcode" | "ai">("barcode");
+  const [scanMode, setScanMode] = useState<"barcode" | "ai">("ai");
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiResults, setAiResults] = useState<any>(null);
@@ -782,46 +782,12 @@ const Scanner = () => {
       {!product ? (
         <Card>
           <CardHeader>
-            <CardTitle>Skanning</CardTitle>
+            <CardTitle>AI Scanner</CardTitle>
             <CardDescription>
-              Välj skanningsläge: streckkod eller AI-etikett
+              Scanna produktetiketter med AI
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Scan mode toggle */}
-            <div className="flex gap-2">
-              <Button
-                variant={scanMode === "barcode" ? "default" : "outline"}
-                onClick={() => setScanMode("barcode")}
-                className="flex-1"
-              >
-                <Scan className="w-4 h-4 mr-2" />
-                Streckkod
-              </Button>
-              <Button
-                variant={scanMode === "ai" ? "default" : "outline"}
-                onClick={() => setScanMode("ai")}
-                className="flex-1"
-              >
-                <Sparkles className="w-4 h-4 mr-2" />
-                AI-Etikett
-              </Button>
-            </div>
-
-            {scanMode === "barcode" && (
-              <>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Ange streckkod manuellt"
-                    value={manualCode}
-                    onChange={(e) => setManualCode(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleManualSearch()}
-                  />
-                  <Button onClick={handleManualSearch}>Sök</Button>
-                </div>
-              </>
-            )}
-
             <div id="reader" className="w-full"></div>
             
             {!cameraStarted ? (
@@ -834,46 +800,34 @@ const Scanner = () => {
                 <Camera className="w-5 h-5 mr-2" />
                 Starta kamera
               </Button>
-            ) : scanMode === "ai" ? (
+            ) : (
               <div className="space-y-3">
-                {/* Stor centrerad foto-knapp */}
-                <div className="flex flex-col items-center gap-4 py-8">
-                  <Button
-                    onClick={captureImage}
-                    disabled={isAnalyzing}
-                    size="lg"
-                    className="h-32 w-32 rounded-full bg-primary hover:bg-primary/90 shadow-2xl relative overflow-hidden disabled:opacity-50"
-                  >
-                    <div className="absolute inset-0 bg-primary-foreground/20 animate-pulse" />
-                    <div className="relative flex flex-col items-center gap-2">
-                      <Camera className="w-12 h-12 text-primary-foreground" />
-                      <span className="text-lg font-bold text-primary-foreground">
-                        {isAnalyzing ? "..." : "TA FOTO"}
-                      </span>
-                    </div>
-                  </Button>
-                  
-                  <div className="text-center space-y-1">
-                    {isAnalyzing ? (
-                      <>
-                        <div className="flex items-center justify-center gap-2">
-                          <Sparkles className="w-5 h-5 text-primary animate-pulse" />
-                          <span className="font-semibold text-primary">Analyserar etikett...</span>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          AI läser av artikelnummer och produktnamn
-                        </p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="font-medium text-foreground">Centrera etiketten</p>
-                        <p className="text-sm text-muted-foreground">
-                          Tryck på knappen när du är redo
-                        </p>
-                      </>
-                    )}
+                <Button
+                  onClick={captureImage}
+                  disabled={isAnalyzing}
+                  size="lg"
+                  className="w-full h-14 bg-primary hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {isAnalyzing ? (
+                    <>
+                      <Sparkles className="w-5 h-5 mr-2 animate-pulse" />
+                      Analyserar...
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="w-5 h-5 mr-2" />
+                      Scanna
+                    </>
+                  )}
+                </Button>
+                
+                {isAnalyzing && (
+                  <div className="text-center py-2">
+                    <p className="text-sm text-muted-foreground">
+                      AI läser av artikelnummer och produktnamn
+                    </p>
                   </div>
-                </div>
+                )}
                 
                 <Button
                   onClick={stopScanning}
@@ -884,7 +838,10 @@ const Scanner = () => {
                   Stoppa kamera
                 </Button>
               </div>
-            ) : (
+            )}
+            
+            {/* Barcode mode (hidden by default) */}
+            {scanMode === "barcode" && cameraStarted && (
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-green-600 dark:text-green-500 font-medium justify-center p-2 bg-green-50 dark:bg-green-950/30 rounded-md">
                   <Camera className="w-5 h-5 animate-pulse" />
