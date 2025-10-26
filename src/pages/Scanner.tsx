@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { Scan, Package, Plus, Minus, CloudUpload, Camera, RotateCcw, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -714,103 +715,116 @@ const Scanner = () => {
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Skanning</CardTitle>
-          <CardDescription>
-            Välj skanningsläge: streckkod eller AI-etikett
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Scan mode toggle */}
-          <div className="flex gap-2">
-            <Button
-              variant={scanMode === "barcode" ? "default" : "outline"}
-              onClick={() => setScanMode("barcode")}
-              className="flex-1"
-            >
-              <Scan className="w-4 h-4 mr-2" />
-              Streckkod
-            </Button>
-            <Button
-              variant={scanMode === "ai" ? "default" : "outline"}
-              onClick={() => setScanMode("ai")}
-              className="flex-1"
-            >
-              <Sparkles className="w-4 h-4 mr-2" />
-              AI-Etikett
-            </Button>
-          </div>
-
-          {scanMode === "barcode" && (
-            <>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Ange streckkod manuellt"
-                  value={manualCode}
-                  onChange={(e) => setManualCode(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleManualSearch()}
-                />
-                <Button onClick={handleManualSearch}>Sök</Button>
-              </div>
-            </>
-          )}
-
-          <div id="reader" className="w-full"></div>
-          
-          {!cameraStarted ? (
-            <Button
-              onClick={startScanning}
-              className="w-full"
-              variant="default"
-              size="lg"
-            >
-              <Camera className="w-5 h-5 mr-2" />
-              Starta kamera
-            </Button>
-          ) : (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-green-600 dark:text-green-500 font-medium justify-center p-2 bg-green-50 dark:bg-green-950/30 rounded-md">
-                <Camera className="w-5 h-5 animate-pulse" />
-                {scanMode === "barcode" ? "Scanna streckkod" : "Redo att ta foto av etikett"}
-              </div>
-              
-              {scanMode === "ai" && (
-                <Button
-                  onClick={captureImage}
-                  disabled={isAnalyzing}
-                  className="w-full"
-                  size="lg"
-                >
-                  {isAnalyzing ? (
-                    <>
-                      <Sparkles className="w-5 h-5 mr-2 animate-spin" />
-                      Analyserar...
-                    </>
-                  ) : (
-                    <>
-                      <Camera className="w-5 h-5 mr-2" />
-                      Ta foto av etikett
-                    </>
-                  )}
-                </Button>
-              )}
-              
+      {!product ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Skanning</CardTitle>
+            <CardDescription>
+              Välj skanningsläge: streckkod eller AI-etikett
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Scan mode toggle */}
+            <div className="flex gap-2">
               <Button
-                onClick={stopScanning}
-                variant="outline"
-                size="sm"
-                className="w-full"
+                variant={scanMode === "barcode" ? "default" : "outline"}
+                onClick={() => setScanMode("barcode")}
+                className="flex-1"
               >
-                Stoppa kamera
+                <Scan className="w-4 h-4 mr-2" />
+                Streckkod
+              </Button>
+              <Button
+                variant={scanMode === "ai" ? "default" : "outline"}
+                onClick={() => setScanMode("ai")}
+                className="flex-1"
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                AI-Etikett
               </Button>
             </div>
-          )}
-        </CardContent>
-      </Card>
+
+            {scanMode === "barcode" && (
+              <>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Ange streckkod manuellt"
+                    value={manualCode}
+                    onChange={(e) => setManualCode(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleManualSearch()}
+                  />
+                  <Button onClick={handleManualSearch}>Sök</Button>
+                </div>
+              </>
+            )}
+
+            <div id="reader" className="w-full"></div>
+            
+            {!cameraStarted ? (
+              <Button
+                onClick={startScanning}
+                className="w-full"
+                variant="default"
+                size="lg"
+              >
+                <Camera className="w-5 h-5 mr-2" />
+                Starta kamera
+              </Button>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-green-600 dark:text-green-500 font-medium justify-center p-2 bg-green-50 dark:bg-green-950/30 rounded-md">
+                  <Camera className="w-5 h-5 animate-pulse" />
+                  {scanMode === "barcode" ? "Scanna streckkod" : "Redo att ta foto av etikett"}
+                </div>
+                
+                {scanMode === "ai" && (
+                  <Button
+                    onClick={captureImage}
+                    disabled={isAnalyzing}
+                    className="w-full"
+                    size="lg"
+                  >
+                    {isAnalyzing ? (
+                      <>
+                        <Sparkles className="w-5 h-5 mr-2 animate-spin" />
+                        Analyserar...
+                      </>
+                    ) : (
+                      <>
+                        <Camera className="w-5 h-5 mr-2" />
+                        Ta foto av etikett
+                      </>
+                    )}
+                  </Button>
+                )}
+                
+                <Button
+                  onClick={stopScanning}
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                >
+                  Stoppa kamera
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="flex justify-between items-center p-3 border rounded-lg bg-card">
+          <div className="flex items-center gap-2 text-sm">
+            <Camera className="w-4 h-4 text-green-600" />
+            <span className="text-muted-foreground">Kamera aktiv</span>
+          </div>
+          <Button onClick={resetScanner} size="sm" variant="outline">
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Scanna nästa
+          </Button>
+        </div>
+      )}
 
       {/* AI Results Display */}
-      {aiResults && (
+      {aiResults && !product && (
         <Card className="border-primary">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -887,7 +901,16 @@ const Scanner = () => {
         </Card>
       )}
 
-      {product && (
+      {product && pickingMode && (
+        <div className="flex justify-between items-center p-3 border rounded-lg bg-card">
+          <div className="flex items-center gap-2">
+            <Package className="w-5 h-5 text-primary" />
+            <span className="font-medium">{product.name}</span>
+          </div>
+        </div>
+      )}
+
+      {product && !pickingMode && (
         <Card>
           <CardHeader>
             <div className="flex items-start justify-between">
@@ -947,61 +970,67 @@ const Scanner = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {activeOrders.map((orderLine: any) => {
-              const order = orderLine.orders;
-              return (
-                <Card 
-                  key={orderLine.id}
-                  className={`cursor-pointer hover:bg-accent transition-colors ${
-                    selectedOrder?.id === order.id ? 'border-primary border-2' : ''
-                  }`}
-                  onClick={() => setSelectedOrder(order)}
-                >
-                  <CardContent className="p-4 space-y-2">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-bold text-lg">Order {order.order_number}</p>
-                        {order.customer_name && (
-                          <p className="text-sm text-muted-foreground">
-                            Kund: {order.customer_name}
-                          </p>
+            <ScrollArea className="h-[400px] pr-4">
+              <div className="space-y-3">
+                {activeOrders.map((orderLine: any) => {
+                  const order = orderLine.orders;
+                  return (
+                    <Card 
+                      key={orderLine.id}
+                      className={`cursor-pointer hover:bg-accent transition-colors ${
+                        selectedOrder?.id === order.id ? 'border-primary border-2' : ''
+                      }`}
+                      onClick={() => setSelectedOrder(order)}
+                    >
+                      <CardContent className="p-4 space-y-2">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-bold text-lg">Order {order.order_number}</p>
+                            {order.customer_name && (
+                              <p className="text-sm text-muted-foreground">
+                                Kund: {order.customer_name}
+                              </p>
+                            )}
+                          </div>
+                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                            {order.status === 'pending' ? 'Väntande' : 'Plockas'}
+                          </span>
+                        </div>
+                        
+                        {order.customer_notes && (
+                          <div className="bg-yellow-50 p-2 rounded border border-yellow-200">
+                            <p className="text-sm font-medium text-yellow-900">
+                              📝 Godsmärke: {order.customer_notes}
+                            </p>
+                          </div>
                         )}
-                      </div>
-                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                        {order.status === 'pending' ? 'Väntande' : 'Plockas'}
-                      </span>
-                    </div>
-                    
-                    {order.customer_notes && (
-                      <div className="bg-yellow-50 p-2 rounded border border-yellow-200">
-                        <p className="text-sm font-medium text-yellow-900">
-                          📝 Godsmärke: {order.customer_notes}
-                        </p>
-                      </div>
-                    )}
-                    
-                    <div className="text-sm">
-                      <p>Antal att plocka: <span className="font-bold">{orderLine.quantity_ordered}</span></p>
-                      <p className="text-xs text-muted-foreground">
-                        Order datum: {new Date(order.order_date).toLocaleDateString('sv-SE')}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                        
+                        <div className="text-sm">
+                          <p>Antal att plocka: <span className="font-bold">{orderLine.quantity_ordered}</span></p>
+                          <p className="text-xs text-muted-foreground">
+                            Order datum: {new Date(order.order_date).toLocaleDateString('sv-SE')}
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </ScrollArea>
             
             {selectedOrder && (
-              <Button 
-                onClick={() => {
-                  const selectedLine = activeOrders.find((ol: any) => ol.orders.id === selectedOrder.id);
-                  handlePickItem(selectedLine.id, selectedOrder.id, selectedLine.quantity_ordered);
-                }}
-                className="w-full mt-4"
-                size="lg"
-              >
-                ✓ Bocka av artikel för order {selectedOrder.order_number}
-              </Button>
+              <div className="sticky bottom-0 bg-background pt-3 border-t">
+                <Button 
+                  onClick={() => {
+                    const selectedLine = activeOrders.find((ol: any) => ol.orders.id === selectedOrder.id);
+                    handlePickItem(selectedLine.id, selectedOrder.id, selectedLine.quantity_ordered);
+                  }}
+                  className="w-full"
+                  size="lg"
+                >
+                  ✓ Bocka av artikel för order {selectedOrder.order_number}
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>
