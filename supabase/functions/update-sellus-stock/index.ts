@@ -209,28 +209,67 @@ Deno.serve(async (req) => {
       console.log(`✨ Using cached numeric ID: ${resolvedNumericId}`);
     }
 
-    // Step 6: Update stock in Sellus with minimal payload
-    console.log(`📤 Updating Sellus item ${resolvedNumericId} (itemNumber: ${itemNumber}) with stock: ${totalStock}`);
+    // Step 6: Fetch full item data from Sellus to preserve all required fields
+    const branchId = Deno.env.get('FDT_SELLUS_BRANCH_ID');
+    console.log(`📥 Fetching full item data from Sellus for item ${resolvedNumericId}${branchId ? ` (branch: ${branchId})` : ''}`);
+    
+    const getEndpoint = branchId 
+      ? `/items/${resolvedNumericId}?branchId=${branchId}`
+      : `/items/${resolvedNumericId}`;
+    
+    const getItemResponse = await callFDTApi({
+      endpoint: getEndpoint,
+      method: 'GET',
+    });
 
-    const minimalPayload: any = {
-      id: resolvedNumericId,
-      itemNumber: itemNumber,
+    if (!getItemResponse.success || !getItemResponse.data) {
+      console.error(`❌ Failed to fetch item data from Sellus: ${getItemResponse.error}`);
+      
+      const duration = Date.now() - startTime;
+      await logSync(supabaseClient, {
+        sync_type: 'inventory_item',
+        direction: 'wms_to_fdt',
+        fdt_article_id: product.fdt_sellus_article_id,
+        wms_product_id: productId,
+        status: 'error',
+        error_message: `Could not fetch item ${resolvedNumericId} from Sellus: ${getItemResponse.error}`,
+        request_payload: { stock: totalStock },
+        duration_ms: duration,
+      });
+
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: `Could not fetch item from Sellus`,
+          details: getItemResponse.error
+        }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Step 7: Merge existing item data with our stock update
+    const existingItem = getItemResponse.data;
+    console.log(`✅ Fetched item data, merging with stock: ${totalStock}`);
+    
+    const updatePayload = {
+      ...existingItem,
       stock: totalStock,
       quantity: totalStock,
       availableQuantity: totalStock,
     };
 
-    // Add branchId if configured
-    const branchId = Deno.env.get('FDT_SELLUS_BRANCH_ID');
+    // Ensure branchId is set if configured
     if (branchId) {
-      minimalPayload.branchId = parseInt(branchId);
+      updatePayload.branchId = parseInt(branchId);
     }
+
+    console.log(`📤 Updating Sellus item ${resolvedNumericId} (itemNumber: ${itemNumber}) with complete payload`);
 
     // Try POST first, fallback to PUT if needed
     let updateResponse = await callFDTApi({
       endpoint: `/items/${resolvedNumericId}`,
       method: 'POST',
-      body: minimalPayload,
+      body: updatePayload,
     });
 
     // If POST fails with method error, try PUT
@@ -239,7 +278,7 @@ Deno.serve(async (req) => {
       updateResponse = await callFDTApi({
         endpoint: `/items/${resolvedNumericId}`,
         method: 'PUT',
-        body: minimalPayload,
+        body: updatePayload,
       });
     }
 
