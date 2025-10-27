@@ -211,7 +211,15 @@ Deno.serve(async (req) => {
 
     // Step 6: Fetch full item data from Sellus to preserve all required fields
     const branchId = Deno.env.get('FDT_SELLUS_BRANCH_ID');
-    console.log(`📥 Fetching full item data from Sellus for item ${resolvedNumericId}${branchId ? ` (branch: ${branchId})` : ''}`);
+    
+    if (!branchId) {
+      console.warn('⚠️ FDT_SELLUS_BRANCH_ID is not configured! Using default branch (0).');
+      console.warn('⚠️ This may cause items to not be found if they exist in a specific branch.');
+    } else {
+      console.log(`✅ Using configured branch: ${branchId}`);
+    }
+    
+    console.log(`📥 Fetching full item data from Sellus for item ${resolvedNumericId}${branchId ? ` (branch: ${branchId})` : ' (default branch)'}`);
     
     const getEndpoint = branchId 
       ? `/items/${resolvedNumericId}?branchId=${branchId}`
@@ -223,7 +231,12 @@ Deno.serve(async (req) => {
     });
 
     if (!getItemResponse.success || !getItemResponse.data) {
+      const errorMsg = branchId 
+        ? `Item ${resolvedNumericId} not found in branch ${branchId}. Check if: 1) Branch ID is correct, 2) Item exists in this branch, 3) Item number ${itemNumber} is correct.`
+        : `Item ${resolvedNumericId} not found. Branch ID is not configured - this may be the issue!`;
+      
       console.error(`❌ Failed to fetch item data from Sellus: ${getItemResponse.error}`);
+      console.error(`💡 ${errorMsg}`);
       
       const duration = Date.now() - startTime;
       await logSync(supabaseClient, {
@@ -232,15 +245,15 @@ Deno.serve(async (req) => {
         fdt_article_id: product.fdt_sellus_article_id,
         wms_product_id: productId,
         status: 'error',
-        error_message: `Could not fetch item ${resolvedNumericId} from Sellus: ${getItemResponse.error}`,
-        request_payload: { stock: totalStock },
+        error_message: errorMsg,
+        request_payload: { stock: totalStock, branchId: branchId || 'not configured' },
         duration_ms: duration,
       });
 
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: `Could not fetch item from Sellus`,
+          error: errorMsg,
           details: getItemResponse.error
         }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

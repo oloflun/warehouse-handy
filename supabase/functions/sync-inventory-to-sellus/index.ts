@@ -71,7 +71,8 @@ Deno.serve(async (req) => {
             syncedCount++;
           }
         } else {
-          throw new Error(result?.error || 'Unknown error');
+          const errorDetail = result?.details || result?.error || 'Unknown error';
+          throw new Error(`${result?.error || 'Sync failed'} - ${errorDetail}`);
         }
 
       } catch (error) {
@@ -92,7 +93,8 @@ Deno.serve(async (req) => {
       })
       .eq('sync_type', 'inventory_export');
 
-    console.log(`✅ Inventory sync completed: ${syncedCount} synced, ${skippedCount} skipped, ${errorCount} errors`);
+    const branchId = Deno.env.get('FDT_SELLUS_BRANCH_ID') || 'not configured';
+    console.log(`✅ Inventory sync completed (branch: ${branchId}): ${syncedCount} synced, ${skippedCount} skipped, ${errorCount} errors`);
 
     return new Response(
       JSON.stringify({
@@ -101,6 +103,7 @@ Deno.serve(async (req) => {
         skipped: skippedCount,
         errors: errorCount,
         errorDetails: errors,
+        branchId: branchId,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
