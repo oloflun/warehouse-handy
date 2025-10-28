@@ -42,7 +42,7 @@ const PREDEFINED_ENDPOINTS = [
   { value: "custom", label: "Anpassad endpoint..." },
 ];
 
-const HTTP_METHODS = ["GET", "POST", "PUT", "DELETE"];
+const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 
 const FDTExplorer = () => {
   const navigate = useNavigate();
@@ -70,7 +70,7 @@ const FDTExplorer = () => {
 
     try {
       let body = null;
-      if (requestBody && (method === "POST" || method === "PUT")) {
+      if (requestBody && (method === "POST" || method === "PUT" || method === "PATCH")) {
         try {
           body = JSON.parse(requestBody);
         } catch (e) {
@@ -192,7 +192,7 @@ const FDTExplorer = () => {
             </div>
 
             {/* Request Body */}
-            {(method === "POST" || method === "PUT") && (
+            {(method === "POST" || method === "PUT" || method === "PATCH") && (
               <div className="space-y-2">
                 <label className="text-sm font-medium">Request Body (JSON)</label>
                 <Textarea
