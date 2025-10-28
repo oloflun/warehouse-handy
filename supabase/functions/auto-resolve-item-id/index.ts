@@ -99,7 +99,34 @@ Deno.serve(async (req) => {
 
     // Build map of Sellus items
     const sellusItems = new Map();
-    for (const item of itemsResponse.data) {
+
+    // Handle different response structures from FDT API
+    const payload = itemsResponse.data;
+    const items = Array.isArray(payload) ? payload : 
+                 payload.results || payload.items || payload.data || [];
+
+    if (!Array.isArray(items)) {
+      console.error('❌ Unexpected response structure from /items:', typeof payload);
+      await logSync(supabaseClient, {
+        sync_type: 'resolve_item_id',
+        direction: 'from_fdt',
+        fdt_article_id: product.fdt_sellus_article_id,
+        wms_product_id: product.id,
+        status: 'error',
+        error_message: `Unexpected response structure: ${typeof payload}`,
+        response_payload: payload,
+        duration_ms: Date.now() - startTime
+      });
+      
+      return new Response(
+        JSON.stringify({ error: 'Unexpected response structure from Sellus API' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`📦 Found ${items.length} items from Sellus`);
+
+    for (const item of items) {
       if (item.itemNumber) {
         sellusItems.set(item.itemNumber.toString(), item.id?.toString());
       }
