@@ -52,9 +52,6 @@ const Scanner = () => {
   }, [navigate]);
 
   useEffect(() => {
-    // Initialize scanner once on mount
-    html5QrCodeRef.current = new Html5Qrcode("reader");
-    
     return () => {
       // Stop automatic scanning
       if (autoScanInterval) {
@@ -75,7 +72,7 @@ const Scanner = () => {
         }
       }
     };
-  }, []);
+  }, [autoScanInterval]);
 
   // Auto-start camera when component mounts and user is authenticated
   useEffect(() => {
@@ -97,7 +94,15 @@ const Scanner = () => {
   };
 
   const startScanning = async () => {
-    if (!html5QrCodeRef.current) return;
+    // Initialize scanner if not already initialized
+    if (!html5QrCodeRef.current) {
+      const readerElement = document.getElementById("reader");
+      if (!readerElement) {
+        toast.error("Scanner element inte tillgängligt än");
+        return;
+      }
+      html5QrCodeRef.current = new Html5Qrcode("reader");
+    }
     
     try {
       const cameras = await Html5Qrcode.getCameras();
