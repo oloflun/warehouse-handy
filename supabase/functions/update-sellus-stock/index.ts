@@ -131,8 +131,8 @@ Deno.serve(async (req) => {
       console.log(`✅ Using cached numeric ID: ${numericId}`);
     }
 
-    // Step 3: Fetch full item data using numeric ID
-    console.log(`📥 Fetching item data from Sellus using numeric ID: ${numericId}`);
+    // Step 3: Fetch current item data to capture old stock (for verification)
+    console.log(`📥 Fetching current item data from Sellus using numeric ID: ${numericId}`);
     console.log(`🏢 Using branch: ${branchId}`);
     
     let getItemResponse = await callFDTApi({
@@ -182,24 +182,25 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Step 4: Merge existing item data with our stock update
+    // Capture old stock for verification
     const existingItem = getItemResponse.data;
-    console.log(`✅ Fetched item data${usedBranchFallback ? ' (without branchId)' : ''}, merging with stock: ${totalStock}`);
+    const oldStock = existingItem.stock || existingItem.quantity || existingItem.availableQuantity || 0;
+    console.log(`📊 Old stock in Sellus: ${oldStock}, New stock to set: ${totalStock}`);
     
+    // Step 4: Create minimal, branch-specific update payload
     const updatePayload = {
-      ...existingItem,
+      id: Number(numericId),
+      branchId: Number(branchId),
       stock: totalStock,
       quantity: totalStock,
       availableQuantity: totalStock,
-      // Only set branchId if the existing item has it (to avoid validation errors)
-      ...(existingItem.branchId ? { branchId: parseInt(branchId) } : {})
     };
 
-    console.log(`📤 Updating Sellus item ${numericId} (article: ${product.fdt_sellus_article_id}) with complete payload`);
+    console.log(`📤 Updating Sellus item ${numericId} (article: ${product.fdt_sellus_article_id}) with branch-specific payload`);
 
-    // Try POST first, fallback to PUT if needed
+    // Try POST first with branch-specific endpoint, fallback to PUT if needed
     let updateResponse = await callFDTApi({
-      endpoint: `/items/${numericId}`,
+      endpoint: `/items/${numericId}?branchId=${branchId}`,
       method: 'POST',
       body: updatePayload,
     });
@@ -208,7 +209,7 @@ Deno.serve(async (req) => {
     if (!updateResponse.success && (updateResponse.error?.includes('405') || updateResponse.error?.includes('Method'))) {
       console.log(`⚠️ POST failed, trying PUT method`);
       updateResponse = await callFDTApi({
-        endpoint: `/items/${numericId}`,
+        endpoint: `/items/${numericId}?branchId=${branchId}`,
         method: 'PUT',
         body: updatePayload,
       });
@@ -217,32 +218,67 @@ Deno.serve(async (req) => {
     const duration = Date.now() - startTime;
 
     if (updateResponse.success) {
-      console.log(`✅ Successfully updated stock in Sellus for ${product.name}`);
-      console.log(`🏢 Branch ID used: ${branchId}${usedBranchFallback ? ' (with fallback)' : ''}`);
+      // Step 5: Read-after-write verification
+      console.log(`🔍 Verifying stock update - reading back from Sellus...`);
+      const verifyResponse = await callFDTApi({
+        endpoint: `/items/${numericId}?branchId=${branchId}`,
+        method: 'GET',
+      });
+
+      let observedStock = totalStock; // Default to what we tried to set
+      let verificationStatus = 'success';
+      let verificationMessage = '';
+
+      if (verifyResponse.success && verifyResponse.data) {
+        observedStock = verifyResponse.data.stock || verifyResponse.data.quantity || verifyResponse.data.availableQuantity || 0;
+        
+        if (observedStock === totalStock) {
+          console.log(`✅ Stock verified: ${totalStock} (matches expected value)`);
+          verificationMessage = `Stock changed from ${oldStock} to ${totalStock} for branch ${branchId}`;
+        } else {
+          console.error(`⚠️ Stock mismatch! Expected: ${totalStock}, Observed: ${observedStock}`);
+          verificationStatus = 'error';
+          verificationMessage = `Branch stock did not change correctly. Expected: ${totalStock}, Observed: ${observedStock}`;
+        }
+      } else {
+        console.warn(`⚠️ Could not verify stock update: ${verifyResponse.error}`);
+        verificationMessage = `Update sent but verification failed: ${verifyResponse.error}`;
+      }
 
       await logSync(supabaseClient, {
         sync_type: 'inventory_item',
         direction: 'wms_to_fdt',
         fdt_article_id: product.fdt_sellus_article_id,
         wms_product_id: productId,
-        status: 'success',
-        request_payload: { stock: totalStock, numericId, articleId: product.fdt_sellus_article_id, branchId, usedBranchFallback },
+        status: verificationStatus,
+        request_payload: { 
+          stock: totalStock, 
+          numericId, 
+          articleId: product.fdt_sellus_article_id, 
+          branchId, 
+          usedBranchFallback,
+          strategy: 'items?id&branchId'
+        },
         response_payload: updateResponse.data,
+        error_message: verificationStatus === 'error' ? verificationMessage : undefined,
         duration_ms: duration,
       });
 
       return new Response(
         JSON.stringify({
-          success: true,
-          message: 'Stock updated in Sellus',
+          success: verificationStatus === 'success',
+          message: verificationMessage,
           product: product.name,
+          oldStock,
           newStock: totalStock,
+          observedStock,
+          verified: observedStock === totalStock,
           numericId,
           articleId: product.fdt_sellus_article_id,
           branchId,
           usedBranchFallback
         }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: verificationStatus === 'success' ? 200 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } else {
       console.error('Failed to update stock in Sellus:', updateResponse.error);
