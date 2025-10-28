@@ -8,12 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { Scan, Package, Plus, Minus, CloudUpload, Camera, RotateCcw, Loader2 } from "lucide-react";
+import { Scan, Package, Plus, Minus, CloudUpload, Camera, RotateCcw, Loader2, Home } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const Scanner = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
   const [scannedCode, setScannedCode] = useState("");
   const [manualCode, setManualCode] = useState("");
@@ -783,6 +785,38 @@ const Scanner = () => {
     setQuantity(1);
     setNotes("");
   };
+
+  // Desktop check - scanner only works on mobile
+  if (!isMobile) {
+    return (
+      <div className="min-h-screen bg-background p-4 flex items-center justify-center">
+        <Card className="max-w-md w-full">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Scan className="w-6 h-6 text-primary" />
+              Scanner endast för mobil
+            </CardTitle>
+            <CardDescription>
+              Scanner-funktionen kräver en mobilenhet med kamera för att fungera korrekt.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              För att använda scannern, vänligen öppna webbplatsen på din mobila enhet eller surfplatta.
+            </p>
+            <Button 
+              onClick={() => navigate("/")} 
+              className="w-full"
+              size="lg"
+            >
+              <Home className="w-4 h-4 mr-2" />
+              Tillbaka till startsidan
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background p-4 space-y-4">

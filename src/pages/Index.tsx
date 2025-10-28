@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Package,
   Scan,
@@ -36,6 +37,7 @@ interface InventoryItem {
 
 const Index = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [user, setUser] = useState<any>(null);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [stats, setStats] = useState({
@@ -229,15 +231,17 @@ const Index = () => {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Button
-          onClick={() => navigate("/scanner")}
-          size="lg"
-          className="h-16 text-lg"
-        >
-          <Scan className="w-6 h-6 mr-2" />
-          Starta Scanner
-        </Button>
+      <div className={`grid grid-cols-1 gap-4 ${isMobile ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+        {isMobile && (
+          <Button
+            onClick={() => navigate("/scanner")}
+            size="lg"
+            className="h-16 text-lg"
+          >
+            <Scan className="w-6 h-6 mr-2" />
+            Starta Scanner
+          </Button>
+        )}
         
         <Button
           onClick={() => navigate("/integrations")}
