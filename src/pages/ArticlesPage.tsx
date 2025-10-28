@@ -14,6 +14,7 @@ interface Article {
   name: string;
   barcode: string | null;
   fdt_sellus_article_id: string | null;
+  fdt_sellus_item_numeric_id: string | null;
   category: string | null;
   fdt_sync_status: string;
   fdt_last_synced: string | null;
@@ -26,6 +27,7 @@ const ArticlesPage = () => {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [resolvingIds, setResolvingIds] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
@@ -97,6 +99,32 @@ const ArticlesPage = () => {
     }
   };
 
+  const handleResolveAllIds = async () => {
+    setResolvingIds(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('batch-resolve-all-ids');
+
+      if (error) throw error;
+
+      const stats = data?.stats || {};
+      
+      toast({
+        title: "ID-upplösning slutförd",
+        description: `Löste ${stats.resolved || 0} av ${stats.total || 0} artiklar${stats.failed > 0 ? `, ${stats.failed} misslyckades` : ''}`,
+      });
+
+      await fetchArticles();
+    } catch (error: any) {
+      toast({
+        title: "Fel vid ID-upplösning",
+        description: error.message || "Okänt fel uppstod",
+        variant: "destructive",
+      });
+    } finally {
+      setResolvingIds(false);
+    }
+  };
+
   const filteredArticles = articles.filter((article) => {
     const query = searchQuery.toLowerCase();
     const articleNumber = article.barcode || article.fdt_sellus_article_id || '';
@@ -127,6 +155,10 @@ const ArticlesPage = () => {
           </div>
         </div>
         <div className="flex gap-2">
+          <Button onClick={handleResolveAllIds} disabled={resolvingIds} variant="secondary">
+            <RefreshCw className={`h-4 w-4 mr-2 ${resolvingIds ? 'animate-spin' : ''}`} />
+            {resolvingIds ? 'Löser IDs...' : 'Lös alla Numeric IDs'}
+          </Button>
           <Button onClick={handleSync} disabled={syncing}>
             <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
             {syncing ? 'Synkroniserar...' : 'Synka från Sellus'}
@@ -157,6 +189,7 @@ const ArticlesPage = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Artikelnummer</TableHead>
+                <TableHead>Numeric ID</TableHead>
                 <TableHead>Benämning</TableHead>
                 <TableHead>Kategori</TableHead>
                 <TableHead>I lager</TableHead>
@@ -171,6 +204,13 @@ const ArticlesPage = () => {
                 return (
                   <TableRow key={article.id}>
                     <TableCell className="font-mono">{articleNumber}</TableCell>
+                    <TableCell className="font-mono text-sm">
+                      {article.fdt_sellus_item_numeric_id ? (
+                        <span className="text-success">{article.fdt_sellus_item_numeric_id}</span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
                     <TableCell className="font-medium">{article.name}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {article.category || '-'}

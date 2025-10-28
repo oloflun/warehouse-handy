@@ -70,9 +70,134 @@ Deno.serve(async (req) => {
       );
     }
 
+    console.log(`🔍 Resolving numeric ID for article: ${product.fdt_sellus_article_id}`);
+    console.log(`📦 Product: ${product.name} (${product.id})`);
+
+    // Strategy 1: Try direct itemNumber search first (most efficient)
+    console.log(`🎯 Strategy 1: Direct itemNumber search`);
+    
+    // Try without branch first
+    try {
+      console.log(`🔎 Trying: GET /items?itemNumber=${product.fdt_sellus_article_id}`);
+      const directResponse = await callFDTApi({
+        endpoint: `/items?itemNumber=${product.fdt_sellus_article_id}`,
+        method: 'GET'
+      });
+
+      if (directResponse.success && directResponse.data) {
+        const payload = directResponse.data;
+        const items = Array.isArray(payload) ? payload : 
+                     payload.results || payload.items || payload.data || [];
+        
+        if (Array.isArray(items) && items.length > 0) {
+          const numericId = items[0].id?.toString();
+          if (numericId) {
+            console.log(`✅ Direct search SUCCESS: ${product.fdt_sellus_article_id} → ${numericId}`);
+            
+            // Cache the numeric ID
+            const { error: updateError } = await supabaseClient
+              .from('products')
+              .update({ 
+                fdt_sellus_item_numeric_id: numericId,
+                fdt_sync_status: 'synced',
+                fdt_last_synced: new Date().toISOString()
+              })
+              .eq('id', product.id);
+
+            if (updateError) {
+              console.error('❌ Failed to cache numeric ID:', updateError);
+            }
+
+            await logSync(supabaseClient, {
+              sync_type: 'resolve_item_id',
+              direction: 'from_fdt',
+              fdt_article_id: product.fdt_sellus_article_id,
+              wms_product_id: product.id,
+              status: 'success',
+              response_payload: { numericId, method: 'direct_search' },
+              duration_ms: Date.now() - startTime
+            });
+
+            return new Response(
+              JSON.stringify({ 
+                success: true, 
+                numericId,
+                articleId: product.fdt_sellus_article_id,
+                productName: product.name,
+                method: 'direct_search'
+              }),
+              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+        }
+      }
+    } catch (error) {
+      console.log(`⚠️ Direct search without branch failed, trying with branch...`);
+    }
+
+    // Try with branch
+    try {
+      console.log(`🔎 Trying: GET /items?itemNumber=${product.fdt_sellus_article_id}&branchId=5`);
+      const directResponse = await callFDTApi({
+        endpoint: `/items?itemNumber=${product.fdt_sellus_article_id}&branchId=5`,
+        method: 'GET'
+      });
+
+      if (directResponse.success && directResponse.data) {
+        const payload = directResponse.data;
+        const items = Array.isArray(payload) ? payload : 
+                     payload.results || payload.items || payload.data || [];
+        
+        if (Array.isArray(items) && items.length > 0) {
+          const numericId = items[0].id?.toString();
+          if (numericId) {
+            console.log(`✅ Direct search with branch SUCCESS: ${product.fdt_sellus_article_id} → ${numericId}`);
+            
+            // Cache the numeric ID
+            const { error: updateError } = await supabaseClient
+              .from('products')
+              .update({ 
+                fdt_sellus_item_numeric_id: numericId,
+                fdt_sync_status: 'synced',
+                fdt_last_synced: new Date().toISOString()
+              })
+              .eq('id', product.id);
+
+            if (updateError) {
+              console.error('❌ Failed to cache numeric ID:', updateError);
+            }
+
+            await logSync(supabaseClient, {
+              sync_type: 'resolve_item_id',
+              direction: 'from_fdt',
+              fdt_article_id: product.fdt_sellus_article_id,
+              wms_product_id: product.id,
+              status: 'success',
+              response_payload: { numericId, method: 'direct_search_with_branch' },
+              duration_ms: Date.now() - startTime
+            });
+
+            return new Response(
+              JSON.stringify({ 
+                success: true, 
+                numericId,
+                articleId: product.fdt_sellus_article_id,
+                productName: product.name,
+                method: 'direct_search_with_branch'
+              }),
+              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+        }
+      }
+    } catch (error) {
+      console.log(`⚠️ Direct search with branch failed, falling back to full scan...`);
+    }
+
+    // Strategy 2: Fallback to fetching all items with pagination
+    console.log(`🎯 Strategy 2: Full item scan with pagination`);
     console.log(`🔎 Fetching all items from Sellus to resolve ID for article: ${product.fdt_sellus_article_id}`);
 
-    // Fetch all items from Sellus
     const itemsResponse = await callFDTApi({
       endpoint: '/items',
       method: 'GET'
@@ -195,7 +320,7 @@ Deno.serve(async (req) => {
       fdt_article_id: product.fdt_sellus_article_id,
       wms_product_id: product.id,
       status: 'success',
-      response_payload: { numericId },
+      response_payload: { numericId, method: 'full_scan' },
       duration_ms: Date.now() - startTime
     });
 
@@ -204,7 +329,8 @@ Deno.serve(async (req) => {
         success: true, 
         numericId,
         articleId: product.fdt_sellus_article_id,
-        productName: product.name
+        productName: product.name,
+        method: 'full_scan'
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
