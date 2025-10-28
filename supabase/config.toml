@@ -3,10 +3,16 @@ project_id = "qadtpwdokdfqtpvwwhsn"
 [functions.analyze-label]
 verify_jwt = true
 
+[functions.auto-resolve-item-id]
+verify_jwt = false
+
 [functions.fdt-api-explorer]
 verify_jwt = false
 
 [functions.resolve-sellus-item-ids]
+verify_jwt = false
+
+[functions.retry-failed-syncs]
 verify_jwt = false
 
 [functions.sync-inventory-to-sellus]
