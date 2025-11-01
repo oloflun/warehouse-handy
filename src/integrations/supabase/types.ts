@@ -14,6 +14,123 @@ export type Database = {
   }
   public: {
     Tables: {
+      delivery_note_items: {
+        Row: {
+          article_number: string
+          checked_at: string | null
+          checked_by: string | null
+          created_at: string | null
+          delivery_note_id: string
+          description: string | null
+          id: string
+          is_checked: boolean | null
+          notes: string | null
+          order_number: string | null
+          product_id: string | null
+          quantity_checked: number | null
+          quantity_expected: number
+        }
+        Insert: {
+          article_number: string
+          checked_at?: string | null
+          checked_by?: string | null
+          created_at?: string | null
+          delivery_note_id: string
+          description?: string | null
+          id?: string
+          is_checked?: boolean | null
+          notes?: string | null
+          order_number?: string | null
+          product_id?: string | null
+          quantity_checked?: number | null
+          quantity_expected: number
+        }
+        Update: {
+          article_number?: string
+          checked_at?: string | null
+          checked_by?: string | null
+          created_at?: string | null
+          delivery_note_id?: string
+          description?: string | null
+          id?: string
+          is_checked?: boolean | null
+          notes?: string | null
+          order_number?: string | null
+          product_id?: string | null
+          quantity_checked?: number | null
+          quantity_expected?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_note_items_delivery_note_id_fkey"
+            columns: ["delivery_note_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_note_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_notes: {
+        Row: {
+          cargo_marking: string | null
+          completed_at: string | null
+          created_at: string | null
+          delivery_note_number: string
+          id: string
+          notes: string | null
+          order_id: string | null
+          scanned_at: string | null
+          scanned_by: string | null
+          status: string | null
+        }
+        Insert: {
+          cargo_marking?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          delivery_note_number: string
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          scanned_at?: string | null
+          scanned_by?: string | null
+          status?: string | null
+        }
+        Update: {
+          cargo_marking?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          delivery_note_number?: string
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          scanned_at?: string | null
+          scanned_by?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_notes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "order_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_notes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fdt_sync_log: {
         Row: {
           created_at: string | null

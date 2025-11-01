@@ -12,6 +12,9 @@ import ArticlesPage from "./pages/ArticlesPage";
 import SalesPage from "./pages/SalesPage";
 import OrderDetailPage from "./pages/OrderDetailPage";
 import FDTExplorer from "./pages/FDTExplorer";
+import DeliveryNotes from "./pages/DeliveryNotes";
+import DeliveryNoteDetail from "./pages/DeliveryNoteDetail";
+import DeliveryNoteScan from "./pages/DeliveryNoteScan";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,6 +34,10 @@ const App = () => (
           <Route path="/integrations/sales" element={<SalesPage />} />
           <Route path="/integrations/sales/:orderId" element={<OrderDetailPage />} />
           <Route path="/fdt-explorer" element={<FDTExplorer />} />
+          <Route path="/delivery-notes" element={<DeliveryNotes />} />
+          <Route path="/delivery-notes/:id" element={<DeliveryNoteDetail />} />
+          <Route path="/delivery-notes/scan" element={<DeliveryNoteScan />} />
+          <Route path="/delivery-notes/scan/:id" element={<DeliveryNoteScan />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

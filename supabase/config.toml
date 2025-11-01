@@ -1,5 +1,8 @@
 project_id = "qadtpwdokdfqtpvwwhsn"
 
+[functions.analyze-delivery-note]
+verify_jwt = false
+
 [functions.analyze-label]
 verify_jwt = true
 

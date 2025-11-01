@@ -8,7 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
-import { RefreshCw, CheckCircle2, XCircle, Clock, Package, List, ShoppingCart, ChevronRight, AlertCircle, Check, QrCode } from "lucide-react";
+import { RefreshCw, CheckCircle2, XCircle, Clock, Package, List, ShoppingCart, ChevronRight, AlertCircle, Check, QrCode, ClipboardList } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface SyncStatus {
@@ -234,18 +234,34 @@ const Integrations = () => {
           <p className="text-muted-foreground">Hantera synkronisering med FDT Sellus & Excellence Retail</p>
         </div>
         <div className="flex gap-2">
-          {isMobile && (
-            <Button 
-              onClick={() => navigate('/scanner')}
-              variant="default"
-              className="flex items-center gap-2"
-            >
-              <QrCode className="h-4 w-4" />
-              Scanner
-            </Button>
-          )}
-          {!isMobile && (
+          {isMobile ? (
             <>
+              <Button 
+                onClick={() => navigate('/scanner')}
+                variant="default"
+                className="flex items-center gap-2"
+              >
+                <QrCode className="h-4 w-4" />
+                Scanner
+              </Button>
+              <Button 
+                onClick={() => navigate('/delivery-notes')}
+                variant="secondary"
+                className="flex items-center gap-2"
+              >
+                <ClipboardList className="h-4 w-4" />
+                Följesedlar
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button 
+                onClick={() => navigate('/delivery-notes')}
+                variant="default"
+              >
+                <ClipboardList className="h-4 w-4 mr-2" />
+                Följesedlar
+              </Button>
               <Button 
                 onClick={resolveAllItemIds}
                 disabled={syncing['resolve-ids']}
