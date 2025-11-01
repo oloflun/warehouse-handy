@@ -8,7 +8,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
-import { RefreshCw, ArrowLeft, CheckCircle2, XCircle, Clock, Package, List, ShoppingCart, ChevronRight, AlertCircle, Check } from "lucide-react";
+import { RefreshCw, CheckCircle2, XCircle, Clock, Package, List, ShoppingCart, ChevronRight, AlertCircle, Check, QrCode } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface SyncStatus {
   id: string;
@@ -38,6 +39,7 @@ const Integrations = () => {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState<Record<string, boolean>>({});
   const [user, setUser] = useState<any>(null);
+  const isMobile = useIsMobile();
 
   const { data: syncFailures, refetch: refetchFailures } = useQuery({
     queryKey: ['sellus-sync-failures'],
@@ -227,26 +229,35 @@ const Integrations = () => {
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold">FDT Integration</h1>
-            <p className="text-muted-foreground">Hantera synkronisering med FDT Sellus & Excellence Retail</p>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold">FDT Integration</h1>
+          <p className="text-muted-foreground">Hantera synkronisering med FDT Sellus & Excellence Retail</p>
         </div>
         <div className="flex gap-2">
-          <Button 
-            onClick={resolveAllItemIds}
-            disabled={syncing['resolve-ids']}
-            variant="secondary"
-          >
-            {syncing['resolve-ids'] ? 'Verifierar...' : 'Verifiera artikelkopplingar'}
-          </Button>
-          <Button onClick={() => navigate('/fdt-explorer')} variant="outline">
-            API Explorer
-          </Button>
+          {isMobile && (
+            <Button 
+              onClick={() => navigate('/scanner')}
+              variant="default"
+              className="flex items-center gap-2"
+            >
+              <QrCode className="h-4 w-4" />
+              Scanner
+            </Button>
+          )}
+          {!isMobile && (
+            <>
+              <Button 
+                onClick={resolveAllItemIds}
+                disabled={syncing['resolve-ids']}
+                variant="secondary"
+              >
+                {syncing['resolve-ids'] ? 'Verifierar...' : 'Verifiera artikelkopplingar'}
+              </Button>
+              <Button onClick={() => navigate('/fdt-explorer')} variant="outline">
+                API Explorer
+              </Button>
+            </>
+          )}
           <Button onClick={fetchData} variant="outline" size="icon">
             <RefreshCw className="h-4 w-4" />
           </Button>
@@ -421,55 +432,57 @@ const Integrations = () => {
         </Alert>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Synkroniseringslogg</CardTitle>
-          <CardDescription>Senaste 50 synkroniseringarna</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Tidpunkt</TableHead>
-                <TableHead>Typ</TableHead>
-                <TableHead>Riktning</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Varaktighet</TableHead>
-                <TableHead>Felmeddelande</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {syncLogs.map((log) => (
-                <TableRow key={log.id}>
-                  <TableCell className="font-mono text-sm">
-                    {new Date(log.created_at).toLocaleString('sv-SE')}
-                  </TableCell>
-                  <TableCell>{getSyncTypeLabel(log.sync_type)}</TableCell>
-                  <TableCell>
-                    {log.direction === 'sellus_to_wms' ? '→ WMS' : '→ FDT'}
-                  </TableCell>
-                  <TableCell>
-                    {log.status === 'success' ? (
-                      <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    ) : (
-                      <XCircle className="h-4 w-4 text-red-600" />
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {log.duration_ms}ms
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {log.error_message || '-'}
-                  </TableCell>
+      {!isMobile && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Synkroniseringslogg</CardTitle>
+            <CardDescription>Senaste 50 synkroniseringarna</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tidpunkt</TableHead>
+                  <TableHead>Typ</TableHead>
+                  <TableHead>Riktning</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Varaktighet</TableHead>
+                  <TableHead>Felmeddelande</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </TableHeader>
+              <TableBody>
+                {syncLogs.map((log) => (
+                  <TableRow key={log.id}>
+                    <TableCell className="font-mono text-sm">
+                      {new Date(log.created_at).toLocaleString('sv-SE')}
+                    </TableCell>
+                    <TableCell>{getSyncTypeLabel(log.sync_type)}</TableCell>
+                    <TableCell>
+                      {log.direction === 'sellus_to_wms' ? '→ WMS' : '→ FDT'}
+                    </TableCell>
+                    <TableCell>
+                      {log.status === 'success' ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-red-600" />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {log.duration_ms}ms
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {log.error_message || '-'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
