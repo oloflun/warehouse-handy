@@ -167,7 +167,7 @@ const SalesPage = () => {
           <Card 
             key={order.id}
             className="cursor-pointer hover:shadow-lg transition-shadow"
-            onClick={() => navigate(`/integrations/sales/${order.id}`)}
+            onClick={() => navigate(`/sales/${order.id}`)}
           >
             <CardHeader>
               <CardTitle className="flex items-center justify-between">

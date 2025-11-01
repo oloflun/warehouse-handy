@@ -91,7 +91,7 @@ const OrderDetailPage = () => {
           <CardContent className="py-12 text-center">
             <AlertCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <p className="text-lg text-muted-foreground">Order hittades inte</p>
-            <Button onClick={() => navigate('/integrations/sales')} className="mt-4">
+            <Button onClick={() => navigate('/sales')} className="mt-4">
               Tillbaka till försäljning
             </Button>
           </CardContent>
@@ -107,7 +107,7 @@ const OrderDetailPage = () => {
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/integrations/sales')}>
+        <Button variant="ghost" size="icon" onClick={() => navigate('/sales')}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
