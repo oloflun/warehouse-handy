@@ -263,53 +263,6 @@ const Index = () => {
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Aktuellt lagersaldo</CardTitle>
-          <CardDescription>De 10 produkterna med lägst lagersaldo</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {inventory.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">
-                Inga produkter i lager än. Börja med att scanna in varor!
-              </p>
-            ) : (
-              inventory.map((item) => {
-                const status = getStockStatus(item);
-                const StatusIcon = status.icon;
-                return (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-medium">{item.product.name}</h3>
-                        <Badge variant={status.variant}>
-                          <StatusIcon className="w-3 h-3 mr-1" />
-                          {status.label}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {item.product.category} • {item.location.name}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold">
-                        {item.quantity}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {item.product.unit}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };
