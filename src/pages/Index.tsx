@@ -8,16 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { useIsMobile } from "@/hooks/use-mobile";
-import {
-  Package,
-  Scan,
-  TrendingUp,
-  TrendingDown,
-  LogOut,
-  AlertTriangle,
-  CheckCircle,
-  AlertCircle,
-} from "lucide-react";
+import { Package, Scan, TrendingUp, TrendingDown, LogOut, AlertTriangle, CheckCircle, AlertCircle } from "lucide-react";
 
 interface InventoryItem {
   id: string;
@@ -47,13 +38,13 @@ const Index = () => {
   });
 
   const { data: syncFailures } = useQuery({
-    queryKey: ['sellus-sync-failures'],
+    queryKey: ["sellus-sync-failures"],
     queryFn: async () => {
       const { data } = await supabase
-        .from('sellus_sync_failures')
-        .select('*')
-        .is('resolved_at', null)
-        .order('created_at', { ascending: false });
+        .from("sellus_sync_failures")
+        .select("*")
+        .is("resolved_at", null)
+        .order("created_at", { ascending: false });
       return data || [];
     },
     refetchInterval: 30000,
@@ -69,7 +60,9 @@ const Index = () => {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (!session) {
         navigate("/auth");
       } else {
@@ -90,11 +83,13 @@ const Index = () => {
   const fetchInventory = async () => {
     const { data, error } = await supabase
       .from("inventory")
-      .select(`
+      .select(
+        `
         *,
         product:products(*),
         location:locations(name)
-      `)
+      `,
+      )
       .order("quantity", { ascending: true })
       .limit(10);
 
@@ -117,10 +112,12 @@ const Index = () => {
 
     const lowStockResult = await supabase
       .from("inventory")
-      .select(`
+      .select(
+        `
         *,
         product:products(min_stock)
-      `)
+      `,
+      )
       .lt("quantity", 10);
 
     setStats({
@@ -153,9 +150,7 @@ const Index = () => {
             <Package className="w-8 h-8 text-primary" />
             WMS Dashboard
           </h1>
-          <p className="text-muted-foreground mt-1">
-            Välkommen, {user?.email}
-          </p>
+          <p className="text-muted-foreground mt-1">Välkommen, {user?.email}</p>
         </div>
         <Button variant="outline" onClick={handleLogout}>
           <LogOut className="w-4 h-4 mr-2" />
@@ -167,29 +162,22 @@ const Index = () => {
         <Alert variant="destructive">
           <AlertCircle className="h-5 w-5" />
           <AlertTitle className="text-lg font-bold">
-            ⚠️ {syncFailures.length} artikel{syncFailures.length > 1 ? 'ar' : ''} misslyckades synka till Sellus!
+            ⚠️ {syncFailures.length} artikel{syncFailures.length > 1 ? "ar" : ""} misslyckades synka till Sellus!
           </AlertTitle>
           <AlertDescription className="mt-2">
             <p className="mb-3">
-              Följande produkter har plockats men lagersaldot har inte uppdaterats i Sellus.
-              Du måste uppdatera dessa MANUELLT:
+              Följande produkter har plockats men lagersaldot har inte uppdaterats i Sellus. Du måste uppdatera dessa
+              MANUELLT:
             </p>
             <ul className="list-disc pl-5 space-y-1">
               {syncFailures.map((failure: any) => (
                 <li key={failure.id}>
-                  <strong>{failure.product_name}</strong> - 
-                  Ändring: {failure.quantity_changed} st - 
-                  Order: {failure.order_number || 'N/A'} - 
-                  {new Date(failure.created_at).toLocaleString('sv-SE')}
+                  <strong>{failure.product_name}</strong> - Ändring: {failure.quantity_changed} st - Order:{" "}
+                  {failure.order_number || "N/A"} -{new Date(failure.created_at).toLocaleString("sv-SE")}
                 </li>
               ))}
             </ul>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="mt-3"
-              onClick={() => navigate('/integrations')}
-            >
+            <Button variant="outline" size="sm" className="mt-3" onClick={() => navigate("/integrations")}>
               Visa detaljer och markera som löst
             </Button>
           </AlertDescription>
@@ -231,38 +219,23 @@ const Index = () => {
         </Card>
       </div>
 
-      <div className={`grid grid-cols-1 gap-4 ${isMobile ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+      <div className={`grid grid-cols-1 gap-4 ${isMobile ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
         {isMobile && (
-          <Button
-            onClick={() => navigate("/scanner")}
-            size="lg"
-            className="h-16 text-lg"
-          >
+          <Button onClick={() => navigate("/scanner")} size="lg" className="h-16 text-lg">
             <Scan className="w-6 h-6 mr-2" />
             Starta Scanner
           </Button>
         )}
-        
-        <Button
-          onClick={() => navigate("/integrations")}
-          size="lg"
-          variant="outline"
-          className="h-16 text-lg"
-        >
+
+        <Button onClick={() => navigate("/integrations")} size="lg" variant="outline" className="h-16 text-lg">
           <Package className="w-6 h-6 mr-2" />
-          FDT Integration
+          Startsida
         </Button>
 
-        <Button
-          onClick={() => navigate("/fdt-explorer")}
-          size="lg"
-          variant="outline"
-          className="h-16 text-lg"
-        >
+        <Button onClick={() => navigate("/fdt-explorer")} size="lg" variant="outline" className="h-16 text-lg">
           API Explorer
         </Button>
       </div>
-
     </div>
   );
 };
