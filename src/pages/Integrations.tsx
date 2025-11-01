@@ -284,7 +284,7 @@ const Integrations = () => {
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader 
             className="cursor-pointer"
-            onClick={() => navigate('/integrations/inventory')}
+            onClick={() => navigate('/inventory')}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -299,7 +299,7 @@ const Integrations = () => {
           <CardContent>
             <div 
               className="cursor-pointer mb-3"
-              onClick={() => navigate('/integrations/inventory')}
+              onClick={() => navigate('/inventory')}
             >
               <p className="text-muted-foreground text-sm mb-2">
                 Visa artiklar i lager med kvantiteter och status
@@ -325,7 +325,7 @@ const Integrations = () => {
 
         <Card 
           className="cursor-pointer hover:shadow-lg transition-shadow"
-          onClick={() => navigate('/integrations/articles')}
+          onClick={() => navigate('/articles')}
         >
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -351,7 +351,7 @@ const Integrations = () => {
 
         <Card 
           className="cursor-pointer hover:shadow-lg transition-shadow"
-          onClick={() => navigate('/integrations/sales')}
+          onClick={() => navigate('/sales')}
         >
           <CardHeader>
             <div className="flex items-center justify-between">

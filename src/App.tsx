@@ -29,10 +29,10 @@ const App = () => (
           <Route path="/" element={<Integrations />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/scanner" element={<Scanner />} />
-          <Route path="/integrations/inventory" element={<InventoryPage />} />
-          <Route path="/integrations/articles" element={<ArticlesPage />} />
-          <Route path="/integrations/sales" element={<SalesPage />} />
-          <Route path="/integrations/sales/:orderId" element={<OrderDetailPage />} />
+          <Route path="/inventory" element={<InventoryPage />} />
+          <Route path="/articles" element={<ArticlesPage />} />
+          <Route path="/sales" element={<SalesPage />} />
+          <Route path="/sales/:orderId" element={<OrderDetailPage />} />
           <Route path="/fdt-explorer" element={<FDTExplorer />} />
           <Route path="/delivery-notes" element={<DeliveryNotes />} />
           <Route path="/delivery-notes/:id" element={<DeliveryNoteDetail />} />

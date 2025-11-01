@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { Scan, Package, Plus, Minus, CloudUpload, Camera, RotateCcw, Loader2, Home } from "lucide-react";
+import { Scan, Package, Plus, Minus, CloudUpload, Camera, RotateCcw, Loader2, Home, ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -825,12 +825,14 @@ const Scanner = () => {
 
   return (
     <div className="min-h-screen bg-background p-4 space-y-4">
+      {/* Header med tillbaka-knapp */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <Scan className="w-6 h-6 text-primary" />
           Scanner
         </h1>
         <Button variant="outline" onClick={() => navigate("/")}>
+          <ArrowLeft className="w-4 h-4 mr-2" />
           Tillbaka
         </Button>
       </div>

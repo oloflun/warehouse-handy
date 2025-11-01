@@ -116,7 +116,7 @@ const SalesPage = () => {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/integrations')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
@@ -167,7 +167,7 @@ const SalesPage = () => {
           <Card 
             key={order.id}
             className="cursor-pointer hover:shadow-lg transition-shadow"
-            onClick={() => navigate(`/integrations/sales/${order.id}`)}
+            onClick={() => navigate(`/sales/${order.id}`)}
           >
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
