@@ -35,6 +35,8 @@ interface HistoryItem {
 const PREDEFINED_ENDPOINTS = [
   { value: "items", label: "Produkter med lagersaldo (/items)" },
   { value: "items/full", label: "Fullständig produktdata inkl. lager (/items/full)" },
+  { value: "items/{id}", label: "Specifik produkt (/items/{id})" },
+  { value: "items/{id}/orders", label: "Ordrar för artikel (/items/{id}/orders)" },
   { value: "orders", label: "Ordrar (/orders)" },
   { value: "customers", label: "Kunder (/customers)" },
   { value: "branches", label: "Butiker/Lager (/branches)" },
@@ -53,9 +55,24 @@ const FDTExplorer = () => {
   const [response, setResponse] = useState<ApiResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [articleId, setArticleId] = useState("");
+  const [branchId, setBranchId] = useState("5");
 
   const getEndpoint = () => {
-    return selectedEndpoint === "custom" ? customEndpoint : selectedEndpoint;
+    let endpoint = selectedEndpoint === "custom" ? customEndpoint : selectedEndpoint;
+    
+    // Replace {id} with articleId if provided
+    if (articleId && endpoint.includes("{id}")) {
+      endpoint = endpoint.replace("{id}", articleId);
+    }
+    
+    // Add branchId as query parameter if provided
+    if (branchId) {
+      const separator = endpoint.includes("?") ? "&" : "?";
+      endpoint = `${endpoint}${separator}branchId=${branchId}`;
+    }
+    
+    return endpoint;
   };
 
   const handleTest = async () => {
@@ -167,12 +184,34 @@ const FDTExplorer = () => {
               <div className="space-y-2">
                 <label className="text-sm font-medium">Anpassad endpoint</label>
                 <Input
-                  placeholder="t.ex. items/12345 eller orders?since=2024-01-01"
+                  placeholder="t.ex. items/{id}/orders eller orders?since=2024-01-01"
                   value={customEndpoint}
                   onChange={(e) => setCustomEndpoint(e.target.value)}
                 />
               </div>
             )}
+
+            {/* Dynamic Parameters */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Artikel-ID (valfritt)</label>
+                <Input
+                  placeholder="t.ex. 297093"
+                  value={articleId}
+                  onChange={(e) => setArticleId(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">Ersätter {"{id}"} i endpoint</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Branch-ID</label>
+                <Input
+                  placeholder="5"
+                  value={branchId}
+                  onChange={(e) => setBranchId(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">Läggs till som ?branchId=</p>
+              </div>
+            </div>
 
             {/* Method Selector */}
             <div className="space-y-2">
