@@ -27,6 +27,7 @@ interface DeliveryNoteItem {
   quantity_checked: number;
   is_checked: boolean;
   product_id: string | null;
+  quantity_modified?: boolean;
 }
 
 export default function DeliveryNoteDetail() {
@@ -74,34 +75,113 @@ export default function DeliveryNoteDetail() {
     }
   };
 
+  const handleQuantityChange = async (itemId: string, newQuantity: number) => {
+    try {
+      const item = items.find(i => i.id === itemId);
+      if (!item) return;
+
+      const isModified = newQuantity !== item.quantity_expected;
+
+      const { error } = await supabase
+        .from('delivery_note_items')
+        .update({
+          quantity_checked: newQuantity,
+          quantity_modified: isModified
+        })
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      setItems(items.map(i => 
+        i.id === itemId 
+          ? { ...i, quantity_checked: newQuantity, quantity_modified: isModified }
+          : i
+      ));
+
+      toast({
+        title: "Antal uppdaterat",
+        description: isModified 
+          ? `Kvantitet ändrad till ${newQuantity} (varning: avviker från följesedel)`
+          : `Kvantitet återställd till ${newQuantity}`,
+        variant: isModified ? "default" : "default",
+      });
+    } catch (error) {
+      console.error('Error updating quantity:', error);
+      toast({
+        title: "Fel",
+        description: "Kunde inte uppdatera antal",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleCheckItem = async (itemId: string, checked: boolean) => {
     try {
+      const item = items.find(i => i.id === itemId);
+      if (!item) return;
+
       const { error } = await supabase
         .from('delivery_note_items')
         .update({
           is_checked: checked,
           checked_at: checked ? new Date().toISOString() : null,
           checked_by: checked ? (await supabase.auth.getUser()).data.user?.id : null,
-          quantity_checked: checked ? items.find(i => i.id === itemId)?.quantity_expected || 0 : 0
+          quantity_checked: checked ? item.quantity_expected : 0
         })
         .eq('id', itemId);
 
       if (error) throw error;
 
       // Update local state
-      setItems(items.map(item => 
-        item.id === itemId 
-          ? { ...item, is_checked: checked, quantity_checked: checked ? item.quantity_expected : 0 }
-          : item
+      setItems(items.map(i => 
+        i.id === itemId 
+          ? { ...i, is_checked: checked, quantity_checked: checked ? item.quantity_expected : 0 }
+          : i
       ));
 
+      // Sync to Sellus when checking an item
+      if (checked) {
+        toast({
+          title: "Synkroniserar till Sellus...",
+          description: "Uppdaterar inköpsorder",
+        });
+
+        // Use quantity_checked to reflect any manual edits
+        const quantityToSync = item.quantity_checked || item.quantity_expected;
+
+        const { data: syncResult, error: syncError } = await supabase.functions.invoke(
+          'sync-purchase-order-to-sellus',
+          {
+            body: {
+              itemNumber: item.article_number,
+              quantityReceived: quantityToSync,
+              cargoMarking: deliveryNote?.cargo_marking || null,
+            }
+          }
+        );
+
+        if (syncError || !syncResult?.success) {
+          console.error("Sellus purchase order sync error:", syncError || syncResult?.error);
+          toast({
+            title: "Varning: Sellus-synkning misslyckades",
+            description: syncError?.message || syncResult?.error || 'Okänt fel',
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "✅ Synkat till Sellus",
+            description: `Inköpsorder uppdaterad för ${item.article_number}`,
+          });
+        }
+      }
+
       // Check if all items are checked and update delivery note status
-      const updatedItems = items.map(item => 
-        item.id === itemId ? { ...item, is_checked: checked } : item
+      const updatedItems = items.map(i => 
+        i.id === itemId ? { ...i, is_checked: checked } : i
       );
       
-      const allChecked = updatedItems.every(item => item.is_checked);
-      const someChecked = updatedItems.some(item => item.is_checked);
+      const allChecked = updatedItems.every(i => i.is_checked);
+      const someChecked = updatedItems.some(i => i.is_checked);
 
       let newStatus = deliveryNote?.status;
       if (allChecked) {
@@ -130,7 +210,7 @@ export default function DeliveryNoteDetail() {
         if (newStatus === 'completed') {
           toast({
             title: "Följesedel klar!",
-            description: "Alla artiklar har checkats av",
+            description: "Alla artiklar har checkats av och synkats till Sellus",
           });
         }
       }
@@ -257,6 +337,7 @@ export default function DeliveryNoteDetail() {
                 item={item}
                 cargoMarking={deliveryNote.cargo_marking}
                 onCheck={handleCheckItem}
+                onQuantityChange={handleQuantityChange}
                 onViewOrder={handleViewOrder}
               />
             ))
