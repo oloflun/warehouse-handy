@@ -30,6 +30,7 @@ const Scanner = () => {
   const [activeOrders, setActiveOrders] = useState<any[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [pickingMode, setPickingMode] = useState(false);
+  const [manualPickQuantity, setManualPickQuantity] = useState<number | null>(null);
   
   // AI scanning state
   const [scanMode, setScanMode] = useState<"barcode" | "ai">("ai");
@@ -91,6 +92,39 @@ const Scanner = () => {
     if (data && data.length > 0) {
       setSelectedLocation(data[0].id);
     }
+  };
+
+  const sortOrdersByDeliveryNote = async (orderLines: any[], product: any) => {
+    // Enrich order lines with delivery note information
+    const ordersWithDeliveryNote = await Promise.all(
+      orderLines.map(async (ol) => {
+        const articleIdentifiers = [
+          product.barcode,
+          product.fdt_sellus_article_id,
+          ol.fdt_article_id
+        ].filter(Boolean);
+
+        // Check if this product is on a delivery note
+        const { data: deliveryNoteItem } = await supabase
+          .from('delivery_note_items')
+          .select('delivery_note_id, order_number')
+          .in('article_number', articleIdentifiers)
+          .maybeSingle();
+        
+        return {
+          ...ol,
+          has_delivery_note: !!deliveryNoteItem,
+          delivery_note_order: deliveryNoteItem?.order_number
+        };
+      })
+    );
+
+    // Sort: delivery note orders first, then by order date
+    return ordersWithDeliveryNote.sort((a, b) => {
+      if (a.has_delivery_note && !b.has_delivery_note) return -1;
+      if (!a.has_delivery_note && b.has_delivery_note) return 1;
+      return new Date(a.orders.order_date).getTime() - new Date(b.orders.order_date).getTime();
+    });
   };
 
   const startScanning = async () => {
@@ -195,6 +229,7 @@ const Scanner = () => {
     setAiResults(null);
     setMatchedProducts([]);
     setIsAnalyzing(false);
+    setManualPickQuantity(null);
     // Camera stays active for next scan
   };
 
@@ -439,7 +474,8 @@ const Scanner = () => {
       const ordersWithProduct = uniqueOrderLines;
       
       if (ordersWithProduct && ordersWithProduct.length > 0) {
-        setActiveOrders(ordersWithProduct);
+        const sortedOrders = await sortOrdersByDeliveryNote(ordersWithProduct, product);
+        setActiveOrders(sortedOrders);
         setPickingMode(true);
       } else {
         setActiveOrders([]);
@@ -549,7 +585,8 @@ const Scanner = () => {
     const ordersWithProduct = uniqueOrderLines;
     
     if (ordersWithProduct && ordersWithProduct.length > 0) {
-      setActiveOrders(ordersWithProduct);
+      const sortedOrders = await sortOrdersByDeliveryNote(ordersWithProduct, selectedProduct);
+      setActiveOrders(sortedOrders);
       setPickingMode(true);
     }
   };
@@ -601,7 +638,8 @@ const Scanner = () => {
       .eq('is_picked', false);
 
     if (ordersWithProduct && ordersWithProduct.length > 0) {
-      setActiveOrders(ordersWithProduct);
+      const sortedOrders = await sortOrdersByDeliveryNote(ordersWithProduct, data);
+      setActiveOrders(sortedOrders);
       setPickingMode(true);
     } else {
       setActiveOrders([]);
@@ -609,9 +647,158 @@ const Scanner = () => {
     }
   };
 
-  const handleManualSearch = () => {
-    if (manualCode) {
-      handleScan(manualCode);
+  const handleManualSearch = async () => {
+    if (!manualCode.trim()) {
+      toast.error("Ange ett artikelnummer");
+      return;
+    }
+    
+    const searchCode = manualCode.trim();
+    toast.loading("Söker produkt...", { id: "manual-search" });
+    
+    // Search by barcode, FDT article ID, or name
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .or(`barcode.eq.${searchCode},fdt_sellus_article_id.eq.${searchCode},name.ilike.%${searchCode}%`)
+      .limit(10);
+
+    if (error) {
+      toast.error("Fel vid sökning av produkt", { id: "manual-search" });
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      toast.error("Produkt hittades inte", { id: "manual-search" });
+      setProduct(null);
+      setActiveOrders([]);
+      return;
+    }
+
+    toast.dismiss("manual-search");
+
+    if (data.length === 1) {
+      const product = data[0];
+      setProduct(product);
+      toast.success(`Produkt hittad: ${product.name}`);
+
+      // Find active orders with this product
+      const productIdentifiers = [
+        product.barcode,
+        product.fdt_sellus_article_id,
+        String(product.id)
+      ].filter(Boolean);
+
+      const [directMatch, fdtMatch] = await Promise.all([
+        supabase
+          .from('order_lines')
+          .select(`
+            id,
+            order_id,
+            product_id,
+            quantity_ordered,
+            quantity_picked,
+            is_picked,
+            fdt_article_id,
+            orders!inner (
+              id,
+              fdt_order_id,
+              order_number,
+              customer_name,
+              customer_notes,
+              status,
+              order_date
+            )
+          `)
+          .eq('product_id', product.id)
+          .in('orders.status', ['pending', 'picking'])
+          .eq('is_picked', false),
+        
+        supabase
+          .from('order_lines')
+          .select(`
+            id,
+            order_id,
+            product_id,
+            quantity_ordered,
+            quantity_picked,
+            is_picked,
+            fdt_article_id,
+            orders!inner (
+              id,
+              fdt_order_id,
+              order_number,
+              customer_name,
+              customer_notes,
+              status,
+              order_date
+            )
+          `)
+          .is('product_id', null)
+          .in('fdt_article_id', productIdentifiers)
+          .in('orders.status', ['pending', 'picking'])
+          .eq('is_picked', false)
+      ]);
+
+      const allOrderLines = [
+        ...(directMatch.data || []),
+        ...(fdtMatch.data || [])
+      ];
+
+      const uniqueOrderLines = Array.from(
+        new Map(allOrderLines.map(ol => [ol.id, ol])).values()
+      );
+
+      const fdtMatchedLines = (fdtMatch.data || []).filter(ol => !ol.product_id);
+      if (fdtMatchedLines.length > 0) {
+        await Promise.all(
+          fdtMatchedLines.map(ol =>
+            supabase
+              .from('order_lines')
+              .update({ product_id: product.id })
+              .eq('id', ol.id)
+          )
+        );
+        toast.info(`Länkade ${fdtMatchedLines.length} orderrader till produkten`);
+      }
+
+      if (uniqueOrderLines && uniqueOrderLines.length > 0) {
+        // Sort orders: delivery note orders first, then by order date
+        const ordersWithDeliveryNote = await Promise.all(
+          uniqueOrderLines.map(async (ol) => {
+            const { data: deliveryNoteItem } = await supabase
+              .from('delivery_note_items')
+              .select('delivery_note_id, order_number')
+              .eq('article_number', product.barcode || product.fdt_sellus_article_id || '')
+              .maybeSingle();
+            
+            return {
+              ...ol,
+              has_delivery_note: !!deliveryNoteItem,
+              delivery_note_order: deliveryNoteItem?.order_number
+            };
+          })
+        );
+
+        // Sort: delivery note orders first, then by order date
+        const sortedOrders = ordersWithDeliveryNote.sort((a, b) => {
+          if (a.has_delivery_note && !b.has_delivery_note) return -1;
+          if (!a.has_delivery_note && b.has_delivery_note) return 1;
+          return new Date(a.orders.order_date).getTime() - new Date(b.orders.order_date).getTime();
+        });
+
+        setActiveOrders(sortedOrders);
+        setPickingMode(true);
+      } else {
+        setActiveOrders([]);
+        setPickingMode(false);
+      }
+    } else {
+      // Multiple matches - show selection
+      setMatchedProducts(data);
+      toast.info(`${data.length} matchande produkter hittade - välj en`, {
+        duration: 4000
+      });
     }
   };
 
@@ -870,6 +1057,27 @@ const Scanner = () => {
                 )}
               </Button>
               
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <Label htmlFor="manualCode" className="text-sm">Eller ange artikelnummer</Label>
+                  <Input
+                    id="manualCode"
+                    placeholder="Artikelnummer"
+                    value={manualCode}
+                    onChange={(e) => setManualCode(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleManualSearch()}
+                    disabled={isAnalyzing}
+                  />
+                </div>
+                <Button 
+                  onClick={handleManualSearch}
+                  disabled={isAnalyzing || !manualCode.trim()}
+                  size="default"
+                >
+                  Sök
+                </Button>
+              </div>
+              
               <Button
                 onClick={stopScanning}
                 variant="outline"
@@ -1020,12 +1228,22 @@ const Scanner = () => {
                       className={`cursor-pointer hover:bg-accent transition-colors ${
                         selectedOrder?.id === order.id ? 'border-primary border-2' : ''
                       }`}
-                      onClick={() => setSelectedOrder(order)}
+                      onClick={() => {
+                        setSelectedOrder(order);
+                        setManualPickQuantity(null);
+                      }}
                     >
                       <CardContent className="p-4 space-y-2">
                         <div className="flex justify-between items-start">
-                          <div>
-                            <p className="font-bold text-lg">Order {order.order_number}</p>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="font-bold text-lg">Order {order.order_number}</p>
+                              {orderLine.has_delivery_note && (
+                                <Badge variant="default" className="bg-green-600">
+                                  Följesedel
+                                </Badge>
+                              )}
+                            </div>
                             {order.customer_name && (
                               <p className="text-sm text-muted-foreground">
                                 Kund: {order.customer_name}
@@ -1058,20 +1276,41 @@ const Scanner = () => {
               </div>
             </ScrollArea>
             
-            {selectedOrder && (
-              <div className="sticky bottom-0 bg-background pt-3 border-t">
-                <Button 
-                  onClick={() => {
-                    const selectedLine = activeOrders.find((ol: any) => ol.orders.id === selectedOrder.id);
-                    handlePickItem(selectedLine.id, selectedOrder.id, selectedLine.quantity_ordered);
-                  }}
-                  className="w-full"
-                  size="lg"
-                >
-                  ✓ Bocka av artikel för order {selectedOrder.order_number}
-                </Button>
-              </div>
-            )}
+            {selectedOrder && (() => {
+              const selectedLine = activeOrders.find((ol: any) => ol.orders.id === selectedOrder.id);
+              const defaultQuantity = selectedLine?.quantity_ordered || 1;
+              const quantityToPick = manualPickQuantity !== null ? manualPickQuantity : defaultQuantity;
+              
+              return (
+                <div className="sticky bottom-0 bg-background pt-3 border-t space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="pickQuantity" className="text-sm">
+                      Antal att plocka (förväntat: {defaultQuantity})
+                    </Label>
+                    <Input
+                      id="pickQuantity"
+                      type="number"
+                      min="1"
+                      placeholder={String(defaultQuantity)}
+                      value={manualPickQuantity !== null ? manualPickQuantity : ''}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value);
+                        setManualPickQuantity(e.target.value && !isNaN(value) ? value : null);
+                      }}
+                    />
+                  </div>
+                  <Button 
+                    onClick={() => {
+                      handlePickItem(selectedLine.id, selectedOrder.id, quantityToPick);
+                    }}
+                    className="w-full"
+                    size="lg"
+                  >
+                    ✓ Bocka av {quantityToPick} st för order {selectedOrder.order_number}
+                  </Button>
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       )}
