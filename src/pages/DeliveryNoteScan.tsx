@@ -216,7 +216,7 @@ export default function DeliveryNoteScan() {
 
       setItems(items.map(i => 
         i.id === itemId 
-          ? { ...i, quantity_checked: newQuantity, quantity_expected: newQuantity, quantity_modified: isModified }
+          ? { ...i, quantity_checked: newQuantity, quantity_modified: isModified }
           : i
       ));
 
@@ -268,12 +268,15 @@ export default function DeliveryNoteScan() {
           description: "Uppdaterar inköpsorder",
         });
 
+        // Use quantity_checked to reflect any manual edits
+        const quantityToSync = item.quantity_checked || item.quantity_expected;
+
         const { data: syncResult, error: syncError } = await supabase.functions.invoke(
           'sync-purchase-order-to-sellus',
           {
             body: {
               itemNumber: item.article_number,
-              quantityReceived: item.quantity_expected,
+              quantityReceived: quantityToSync,
               cargoMarking: cargoMarking || null,
             }
           }
