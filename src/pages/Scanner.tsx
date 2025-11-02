@@ -1088,32 +1088,37 @@ const Scanner = () => {
               </div>
             </ScrollArea>
             
-            {selectedOrder && (
-              <div className="sticky bottom-0 bg-background pt-3 border-t space-y-3">
-                <div className="space-y-2">
-                  <Label htmlFor="pickQuantity">Antal att plocka</Label>
-                  <Input
-                    id="pickQuantity"
-                    type="number"
-                    min="1"
-                    placeholder={`Standard: ${activeOrders.find((ol: any) => ol.orders.id === selectedOrder.id)?.quantity_ordered || 0}`}
-                    value={manualPickQuantity ?? ""}
-                    onChange={(e) => setManualPickQuantity(e.target.value ? parseInt(e.target.value) : null)}
-                  />
+            {selectedOrder && (() => {
+              const selectedLine = activeOrders.find((ol: any) => ol.orders.id === selectedOrder.id);
+              return (
+                <div className="sticky bottom-0 bg-background pt-3 border-t space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="pickQuantity">Antal att plocka</Label>
+                    <Input
+                      id="pickQuantity"
+                      type="number"
+                      min="1"
+                      placeholder={`Standard: ${selectedLine?.quantity_ordered || 0}`}
+                      value={manualPickQuantity ?? ""}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value);
+                        setManualPickQuantity(e.target.value && !isNaN(value) ? value : null);
+                      }}
+                    />
+                  </div>
+                  <Button 
+                    onClick={() => {
+                      const quantityToPick = manualPickQuantity ?? selectedLine.quantity_ordered;
+                      handlePickItem(selectedLine.id, selectedOrder.id, quantityToPick);
+                    }}
+                    className="w-full"
+                    size="lg"
+                  >
+                    ✓ Bocka av artikel för order {selectedOrder.order_number}
+                  </Button>
                 </div>
-                <Button 
-                  onClick={() => {
-                    const selectedLine = activeOrders.find((ol: any) => ol.orders.id === selectedOrder.id);
-                    const quantityToPick = manualPickQuantity ?? selectedLine.quantity_ordered;
-                    handlePickItem(selectedLine.id, selectedOrder.id, quantityToPick);
-                  }}
-                  className="w-full"
-                  size="lg"
-                >
-                  ✓ Bocka av artikel för order {selectedOrder.order_number}
-                </Button>
-              </div>
-            )}
+              );
+            })()}
           </CardContent>
         </Card>
       )}
