@@ -1,7 +1,10 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Package, FileText, Tag } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Package, FileText, Tag, AlertTriangle, Edit2, Check, X } from "lucide-react";
+import { useState } from "react";
 
 interface DeliveryNoteItem {
   id: string;
@@ -12,12 +15,14 @@ interface DeliveryNoteItem {
   quantity_checked: number;
   is_checked: boolean;
   product_id: string | null;
+  quantity_modified?: boolean;
 }
 
 interface DeliveryNoteItemCardProps {
   item: DeliveryNoteItem;
   cargoMarking?: string | null;
   onCheck: (id: string, checked: boolean) => void;
+  onQuantityChange?: (id: string, newQuantity: number) => void;
   onViewOrder?: (orderNumber: string) => void;
 }
 
@@ -25,13 +30,31 @@ export const DeliveryNoteItemCard = ({
   item, 
   cargoMarking,
   onCheck,
+  onQuantityChange,
   onViewOrder 
 }: DeliveryNoteItemCardProps) => {
+  const [isEditingQuantity, setIsEditingQuantity] = useState(false);
+  const [editedQuantity, setEditedQuantity] = useState(item.quantity_expected);
+
+  const handleSaveQuantity = () => {
+    if (editedQuantity !== item.quantity_expected && onQuantityChange) {
+      onQuantityChange(item.id, editedQuantity);
+    }
+    setIsEditingQuantity(false);
+  };
+
+  const handleCancelEdit = () => {
+    setEditedQuantity(item.quantity_expected);
+    setIsEditingQuantity(false);
+  };
+
   return (
     <Card 
       className={`p-4 transition-colors ${
         item.is_checked 
           ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800' 
+          : item.quantity_modified
+          ? 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800'
           : 'bg-card'
       }`}
     >
@@ -40,6 +63,7 @@ export const DeliveryNoteItemCard = ({
           checked={item.is_checked}
           onCheckedChange={(checked) => onCheck(item.id, checked as boolean)}
           className="mt-1 h-6 w-6"
+          disabled={item.is_checked}
         />
         
         <div className="flex-1 space-y-2">
@@ -50,6 +74,12 @@ export const DeliveryNoteItemCard = ({
                 <span className="font-mono text-lg font-bold">
                   {item.article_number}
                 </span>
+                {item.quantity_modified && (
+                  <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900 dark:text-yellow-100">
+                    <AlertTriangle className="h-3 w-3 mr-1" />
+                    Ändrad kvantitet
+                  </Badge>
+                )}
               </div>
               
               {item.order_number && (
@@ -74,9 +104,53 @@ export const DeliveryNoteItemCard = ({
               )}
             </div>
             
-            <Badge variant={item.is_checked ? "default" : "secondary"}>
-              {item.quantity_checked}/{item.quantity_expected} st
-            </Badge>
+            <div className="flex flex-col items-end gap-2">
+              {!isEditingQuantity ? (
+                <>
+                  <Badge variant={item.is_checked ? "default" : "secondary"}>
+                    {item.quantity_checked}/{item.quantity_expected} st
+                  </Badge>
+                  {!item.is_checked && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsEditingQuantity(true)}
+                      className="h-6 px-2 text-xs"
+                    >
+                      <Edit2 className="h-3 w-3 mr-1" />
+                      Ändra antal
+                    </Button>
+                  )}
+                </>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min="1"
+                    value={editedQuantity}
+                    onChange={(e) => setEditedQuantity(parseInt(e.target.value) || 1)}
+                    className="w-20 h-8 text-sm"
+                    autoFocus
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleSaveQuantity}
+                    className="h-8 w-8 p-0"
+                  >
+                    <Check className="h-4 w-4 text-green-600" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCancelEdit}
+                    className="h-8 w-8 p-0"
+                  >
+                    <X className="h-4 w-4 text-red-600" />
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
           
           {item.description && (
