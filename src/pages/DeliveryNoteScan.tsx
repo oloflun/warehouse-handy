@@ -28,6 +28,7 @@ export default function DeliveryNoteScan() {
   const [scanning, setScanning] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
+  const [cameraLoading, setCameraLoading] = useState(false);
   const [deliveryNoteId, setDeliveryNoteId] = useState<string | null>(id || null);
   const [deliveryNoteNumber, setDeliveryNoteNumber] = useState("");
   const [cargoMarking, setCargoMarking] = useState("");
@@ -80,35 +81,94 @@ export default function DeliveryNoteScan() {
 
   const startCamera = async () => {
     try {
+      console.log('Starting camera...');
+      setCameraLoading(true);
+      setCameraActive(true);
+      
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }
+        video: { 
+          facingMode: 'environment',
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        }
       });
+      
+      console.log('Camera stream acquired');
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        setCameraActive(true);
+        
+        // Vänta på att video metadata är laddad innan play
+        videoRef.current.onloadedmetadata = async () => {
+          try {
+            await videoRef.current?.play();
+            console.log('Video playing');
+            setCameraLoading(false);
+          } catch (playError) {
+            console.error('Error playing video:', playError);
+            toast({
+              title: "Videofel",
+              description: "Kunde inte starta videouppspelning",
+              variant: "destructive",
+            });
+            stopCamera();
+          }
+        };
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error starting camera:', error);
+      setCameraActive(false);
+      setCameraLoading(false);
+      
+      let errorMessage = "Kunde inte starta kameran";
+      if (error.name === 'NotAllowedError') {
+        errorMessage = "Kameratillstånd nekades. Tillåt kameraåtkomst i webbläsaren.";
+      } else if (error.name === 'NotFoundError') {
+        errorMessage = "Ingen kamera hittades på enheten";
+      } else if (error.name === 'NotReadableError') {
+        errorMessage = "Kameran används redan av en annan app";
+      }
+      
       toast({
         title: "Kamerafel",
-        description: "Kunde inte starta kameran",
+        description: errorMessage,
         variant: "destructive",
       });
     }
   };
 
   const stopCamera = () => {
+    console.log('Stopping camera');
     if (videoRef.current?.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
+      stream.getTracks().forEach(track => {
+        track.stop();
+        console.log('Track stopped:', track.kind);
+      });
       videoRef.current.srcObject = null;
     }
     setCameraActive(false);
+    setCameraLoading(false);
   };
 
   const captureAndAnalyze = async () => {
-    if (!videoRef.current) return;
+    if (!videoRef.current) {
+      toast({
+        title: "Fel",
+        description: "Video-elementet är inte tillgängligt",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA) {
+      toast({
+        title: "Vänta",
+        description: "Kameran är inte redo ännu",
+        variant: "default",
+      });
+      return;
+    }
 
     setAnalyzing(true);
     try {
@@ -379,7 +439,8 @@ export default function DeliveryNoteScan() {
                     ref={videoRef}
                     autoPlay
                     playsInline
-                    className="w-full rounded-lg"
+                    muted
+                    className="w-full rounded-lg bg-black min-h-[300px]"
                   />
                   <div className="flex gap-2">
                     <Button
@@ -405,9 +466,22 @@ export default function DeliveryNoteScan() {
                   </div>
                 </div>
               ) : (
-                <Button onClick={startCamera} className="w-full">
-                  <Camera className="mr-2 h-4 w-4" />
-                  Starta kamera
+                <Button 
+                  onClick={startCamera} 
+                  className="w-full"
+                  disabled={cameraLoading}
+                >
+                  {cameraLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Startar kamera...
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="mr-2 h-4 w-4" />
+                      Starta kamera
+                    </>
+                  )}
                 </Button>
               )}
             </CardContent>
