@@ -30,6 +30,7 @@ const Scanner = () => {
   const [activeOrders, setActiveOrders] = useState<any[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [pickingMode, setPickingMode] = useState(false);
+  const [manualPickQuantity, setManualPickQuantity] = useState<number | null>(null);
   
   // AI scanning state
   const [scanMode, setScanMode] = useState<"barcode" | "ai">("ai");
@@ -191,6 +192,7 @@ const Scanner = () => {
     setPickingMode(false);
     setScannedCode("");
     setManualCode("");
+    setManualPickQuantity(null);
     setCapturedImage(null);
     setAiResults(null);
     setMatchedProducts([]);
@@ -878,6 +880,31 @@ const Scanner = () => {
               >
                 Stoppa kamera
               </Button>
+
+              {/* Manual input section */}
+              <div className="pt-4 border-t space-y-3">
+                <Label htmlFor="manualCode">Eller ange artikelnummer manuellt</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="manualCode"
+                    placeholder="Artikelnummer"
+                    value={manualCode}
+                    onChange={(e) => setManualCode(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleManualSearch();
+                      }
+                    }}
+                  />
+                  <Button
+                    onClick={handleManualSearch}
+                    disabled={!manualCode}
+                    variant="secondary"
+                  >
+                    <Scan className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
             
@@ -1020,7 +1047,10 @@ const Scanner = () => {
                       className={`cursor-pointer hover:bg-accent transition-colors ${
                         selectedOrder?.id === order.id ? 'border-primary border-2' : ''
                       }`}
-                      onClick={() => setSelectedOrder(order)}
+                      onClick={() => {
+                        setSelectedOrder(order);
+                        setManualPickQuantity(null);
+                      }}
                     >
                       <CardContent className="p-4 space-y-2">
                         <div className="flex justify-between items-start">
@@ -1058,20 +1088,37 @@ const Scanner = () => {
               </div>
             </ScrollArea>
             
-            {selectedOrder && (
-              <div className="sticky bottom-0 bg-background pt-3 border-t">
-                <Button 
-                  onClick={() => {
-                    const selectedLine = activeOrders.find((ol: any) => ol.orders.id === selectedOrder.id);
-                    handlePickItem(selectedLine.id, selectedOrder.id, selectedLine.quantity_ordered);
-                  }}
-                  className="w-full"
-                  size="lg"
-                >
-                  ✓ Bocka av artikel för order {selectedOrder.order_number}
-                </Button>
-              </div>
-            )}
+            {selectedOrder && (() => {
+              const selectedLine = activeOrders.find((ol: any) => ol.orders.id === selectedOrder.id);
+              return (
+                <div className="sticky bottom-0 bg-background pt-3 border-t space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="pickQuantity">Antal att plocka</Label>
+                    <Input
+                      id="pickQuantity"
+                      type="number"
+                      min="1"
+                      placeholder={`Standard: ${selectedLine?.quantity_ordered || 0}`}
+                      value={manualPickQuantity ?? ""}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value);
+                        setManualPickQuantity(e.target.value && !isNaN(value) ? value : null);
+                      }}
+                    />
+                  </div>
+                  <Button 
+                    onClick={() => {
+                      const quantityToPick = manualPickQuantity ?? selectedLine.quantity_ordered;
+                      handlePickItem(selectedLine.id, selectedOrder.id, quantityToPick);
+                    }}
+                    className="w-full"
+                    size="lg"
+                  >
+                    ✓ Bocka av artikel för order {selectedOrder.order_number}
+                  </Button>
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       )}
