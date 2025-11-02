@@ -95,29 +95,55 @@ const Scanner = () => {
   };
 
   const sortOrdersByDeliveryNote = async (orderLines: any[], product: any) => {
-    // Enrich order lines with delivery note information
-    const ordersWithDeliveryNote = await Promise.all(
-      orderLines.map(async (ol) => {
-        const articleIdentifiers = [
-          product.barcode,
-          product.fdt_sellus_article_id,
-          ol.fdt_article_id
-        ].filter(Boolean);
+    // Collect all unique article identifiers from the product and order lines
+    const allArticleIdentifiers = new Set<string>();
+    
+    [product.barcode, product.fdt_sellus_article_id].forEach(id => {
+      if (id) allArticleIdentifiers.add(id);
+    });
+    
+    orderLines.forEach(ol => {
+      if (ol.fdt_article_id) allArticleIdentifiers.add(ol.fdt_article_id);
+    });
 
-        // Check if this product is on a delivery note
-        const { data: deliveryNoteItem } = await supabase
-          .from('delivery_note_items')
-          .select('delivery_note_id, order_number')
-          .in('article_number', articleIdentifiers)
-          .maybeSingle();
-        
-        return {
-          ...ol,
-          has_delivery_note: !!deliveryNoteItem,
-          delivery_note_order: deliveryNoteItem?.order_number
-        };
-      })
-    );
+    // If no valid identifiers, return orders sorted by date only
+    if (allArticleIdentifiers.size === 0) {
+      return orderLines.sort((a, b) => 
+        new Date(a.orders.order_date).getTime() - new Date(b.orders.order_date).getTime()
+      );
+    }
+
+    // Fetch all delivery note items in a single query
+    const { data: deliveryNoteItems } = await supabase
+      .from('delivery_note_items')
+      .select('article_number, delivery_note_id, order_number')
+      .in('article_number', Array.from(allArticleIdentifiers));
+
+    // Create a map for quick lookup
+    const deliveryNoteMap = new Map<string, any>();
+    deliveryNoteItems?.forEach(item => {
+      deliveryNoteMap.set(item.article_number, item);
+    });
+
+    // Enrich order lines with delivery note information
+    const ordersWithDeliveryNote = orderLines.map(ol => {
+      const identifiers = [
+        product.barcode,
+        product.fdt_sellus_article_id,
+        ol.fdt_article_id
+      ].filter(Boolean);
+
+      // Check if any identifier matches a delivery note
+      const deliveryNoteItem = identifiers
+        .map(id => deliveryNoteMap.get(id))
+        .find(item => item);
+      
+      return {
+        ...ol,
+        has_delivery_note: !!deliveryNoteItem,
+        delivery_note_order: deliveryNoteItem?.order_number
+      };
+    });
 
     // Sort: delivery note orders first, then by order date
     return ordersWithDeliveryNote.sort((a, b) => {
@@ -763,30 +789,7 @@ const Scanner = () => {
       }
 
       if (uniqueOrderLines && uniqueOrderLines.length > 0) {
-        // Sort orders: delivery note orders first, then by order date
-        const ordersWithDeliveryNote = await Promise.all(
-          uniqueOrderLines.map(async (ol) => {
-            const { data: deliveryNoteItem } = await supabase
-              .from('delivery_note_items')
-              .select('delivery_note_id, order_number')
-              .eq('article_number', product.barcode || product.fdt_sellus_article_id || '')
-              .maybeSingle();
-            
-            return {
-              ...ol,
-              has_delivery_note: !!deliveryNoteItem,
-              delivery_note_order: deliveryNoteItem?.order_number
-            };
-          })
-        );
-
-        // Sort: delivery note orders first, then by order date
-        const sortedOrders = ordersWithDeliveryNote.sort((a, b) => {
-          if (a.has_delivery_note && !b.has_delivery_note) return -1;
-          if (!a.has_delivery_note && b.has_delivery_note) return 1;
-          return new Date(a.orders.order_date).getTime() - new Date(b.orders.order_date).getTime();
-        });
-
+        const sortedOrders = await sortOrdersByDeliveryNote(uniqueOrderLines, product);
         setActiveOrders(sortedOrders);
         setPickingMode(true);
       } else {
@@ -1295,7 +1298,7 @@ const Scanner = () => {
                       value={manualPickQuantity !== null ? manualPickQuantity : ''}
                       onChange={(e) => {
                         const value = parseInt(e.target.value);
-                        setManualPickQuantity(e.target.value && !isNaN(value) ? value : null);
+                        setManualPickQuantity(e.target.value && !isNaN(value) && value >= 1 ? value : null);
                       }}
                     />
                   </div>
