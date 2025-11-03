@@ -40,11 +40,9 @@ const UserManagement = () => {
   const { data: users, isLoading } = useQuery({
     queryKey: ["users-with-roles"],
     queryFn: async () => {
-      const { data: roles } = await supabase
-        .from("user_roles")
-        .select("user_id, role");
-      
-      return roles || [];
+      const { data, error } = await supabase.functions.invoke("list-users");
+      if (error) throw error;
+      return data.users || [];
     },
     enabled: currentUser?.role === "admin",
   });
@@ -201,24 +199,24 @@ const UserManagement = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users?.map((userRole: any) => (
-                    <TableRow key={userRole.user_id}>
-                      <TableCell className="font-medium">{userRole.user_id}</TableCell>
+                  {users?.map((user: any) => (
+                    <TableRow key={user.id}>
+                      <TableCell className="font-medium">{user.email}</TableCell>
                       <TableCell>
-                        {userRole.role === "admin" ? (
+                        {user.role === "admin" ? (
                           <Badge variant="default" className="gap-1">
                             <Shield className="h-3 w-3" />
                             Admin
                           </Badge>
                         ) : (
                           <Badge variant="secondary" className="gap-1">
-                            <User className="h-3 w-3" />
+                            <User className="h-3 w-4" />
                             Användare
                           </Badge>
                         )}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {new Date(userRole.created_at).toLocaleDateString("sv-SE")}
+                        {new Date(user.created_at).toLocaleDateString("sv-SE")}
                       </TableCell>
                     </TableRow>
                   ))}
