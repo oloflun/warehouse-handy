@@ -53,7 +53,10 @@ export const ProfileButtonTopRight = () => {
 
   if (isLoading) {
     return (
-      <div className="fixed top-2 right-2 md:top-4 md:right-4 z-[100]">
+      <div 
+        className="fixed top-2 right-2 md:top-4 md:right-4 z-[9999]"
+        style={{ position: 'fixed', zIndex: 9999, pointerEvents: 'auto' }}
+      >
         <Skeleton className="h-11 w-11 rounded-full" />
       </div>
     );
@@ -63,7 +66,8 @@ export const ProfileButtonTopRight = () => {
     <button
       type="button"
       onClick={() => navigate("/user-management")}
-      className="fixed top-2 right-2 md:top-4 md:right-4 z-[100] h-11 w-11 rounded-full bg-primary text-primary-foreground font-semibold shadow-lg ring-2 ring-background hover:opacity-90 focus:outline-none focus-visible:ring-4 focus-visible:ring-ring pointer-events-auto transition-opacity"
+      className="fixed top-2 right-2 md:top-4 md:right-4 z-[9999] h-11 w-11 rounded-full bg-primary text-primary-foreground font-semibold shadow-lg ring-2 ring-background hover:opacity-90 focus:outline-none focus-visible:ring-4 focus-visible:ring-ring pointer-events-auto transition-opacity"
+      style={{ position: 'fixed', zIndex: 9999, pointerEvents: 'auto' }}
       aria-label="Öppna användarhantering"
       title="Öppna användarhantering"
     >

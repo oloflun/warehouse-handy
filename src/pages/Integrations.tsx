@@ -229,15 +229,15 @@ const Integrations = () => {
     return 'default';
   };
   if (loading) {
-    return <div className="container mx-auto p-6">Laddar...</div>;
+    return <div className="w-full max-w-full px-4 py-6">Laddar...</div>;
   }
-  return <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-extrabold text-4xl">LOGIC WMS</h1>
+  return <div className="w-full max-w-full px-4 py-6 md:container md:mx-auto md:px-6 space-y-6">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h1 className="font-extrabold text-2xl sm:text-3xl md:text-4xl truncate">LOGIC WMS</h1>
           
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 items-center justify-end">
           {isMobile ? <>
               <Button onClick={() => navigate('/scanner')} variant="default" className="flex items-center gap-2">
                 <QrCode className="h-4 w-4" />
