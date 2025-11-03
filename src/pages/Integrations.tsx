@@ -55,6 +55,21 @@ const Integrations = () => {
     enabled: !!user,
   });
 
+  const { data: syncDiscrepancies } = useQuery({
+    queryKey: ['sellus-sync-discrepancies'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('sellus_sync_discrepancies')
+        .select('*')
+        .eq('resolved', false)
+        .order('severity', { ascending: false })
+        .order('created_at', { ascending: false });
+      return data || [];
+    },
+    refetchInterval: 30000,
+    enabled: !!user,
+  });
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user || null);
