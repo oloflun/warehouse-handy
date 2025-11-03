@@ -15,6 +15,7 @@ import FDTExplorer from "./pages/FDTExplorer";
 import DeliveryNotes from "./pages/DeliveryNotes";
 import DeliveryNoteDetail from "./pages/DeliveryNoteDetail";
 import DeliveryNoteScan from "./pages/DeliveryNoteScan";
+import UserManagement from "./pages/UserManagement";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ const App = () => (
           <Route path="/delivery-notes/:id" element={<DeliveryNoteDetail />} />
           <Route path="/delivery-notes/scan" element={<DeliveryNoteScan />} />
           <Route path="/delivery-notes/scan/:id" element={<DeliveryNoteScan />} />
+          <Route path="/user-management" element={<UserManagement />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

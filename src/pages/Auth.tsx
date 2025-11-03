@@ -10,7 +10,7 @@ import { Package } from "lucide-react";
 
 const Auth = () => {
   const navigate = useNavigate();
-  const [isLogin, setIsLogin] = useState(true);
+  // Removed isLogin state - only login mode is available
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [email, setEmail] = useState("");
@@ -25,10 +25,9 @@ const Auth = () => {
     const type = hashParams.get('type');
     const isRecoveryMode = type === 'recovery';
     
-    if (isRecoveryMode) {
+      if (isRecoveryMode) {
       setIsResettingPassword(true);
       setIsForgotPassword(false);
-      setIsLogin(false);
       // Clean up URL hash
       window.history.replaceState(null, '', window.location.pathname);
     }
@@ -105,26 +104,17 @@ const Auth = () => {
         if (error) throw error;
         toast.success("Återställningslänk skickad till din e-post!");
         setIsForgotPassword(false);
-      } else if (isLogin) {
+      } else {
+        // Only login - no registration
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
         toast.success("Inloggad!");
-      } else {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/`,
-          },
-        });
-        if (error) throw error;
-        toast.success("Konto skapat! Du är nu inloggad.");
       }
     } catch (error: any) {
-      toast.error(error.message || "Ett fel uppstod");
+      toast.error(error.message || "Ett fel uppstod vid inloggning");
     } finally {
       setLoading(false);
     }
@@ -143,9 +133,7 @@ const Auth = () => {
               ? "Ställ in ditt nya lösenord"
               : isForgotPassword 
                 ? "Återställ ditt lösenord" 
-                : isLogin 
-                  ? "Logga in på ditt konto" 
-                  : "Skapa ett nytt konto"}
+                : "Logga in på ditt konto"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -211,26 +199,14 @@ const Auth = () => {
                     ? "Laddar..." 
                     : isForgotPassword 
                       ? "Skicka återställningslänk" 
-                      : isLogin 
-                        ? "Logga in" 
-                        : "Skapa konto"}
+                      : "Logga in"}
                 </Button>
               </form>
-              <div className="mt-4 text-center text-sm space-y-2">
-                {!isForgotPassword && (
-                  <button
-                    type="button"
-                    onClick={() => setIsLogin(!isLogin)}
-                    className="text-primary hover:underline block w-full"
-                  >
-                    {isLogin ? "Inget konto? Skapa ett här" : "Har redan ett konto? Logga in"}
-                  </button>
-                )}
+              <div className="mt-4 text-center text-sm">
                 <button
                   type="button"
                   onClick={() => {
                     setIsForgotPassword(!isForgotPassword);
-                    setIsLogin(true);
                   }}
                   className="text-primary hover:underline block w-full"
                 >
