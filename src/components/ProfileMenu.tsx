@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -50,23 +50,19 @@ export const ProfileMenu = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
       
-      // Fetch profile
-      const { data: profile, error: profileError } = await supabase
+      // Fetch profile - use maybeSingle to avoid errors when no profile exists
+      const { data: profile } = await supabase
         .from("profiles")
         .select("first_name, last_name")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
       
-      if (profileError) throw profileError;
-      
-      // Fetch role
-      const { data: roleData, error: roleError } = await supabase
+      // Fetch role - use maybeSingle to avoid errors when no role exists
+      const { data: roleData } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id)
-        .single();
-      
-      if (roleError) throw roleError;
+        .maybeSingle();
       
       return {
         id: user.id,
@@ -75,8 +71,19 @@ export const ProfileMenu = () => {
         last_name: profile?.last_name || "",
         role: roleData?.role || "user"
       };
-    }
+    },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false
   });
+
+  // Invalidate query on auth state changes
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      queryClient.invalidateQueries({ queryKey: ["current-user-profile"] });
+    });
+
+    return () => subscription.unsubscribe();
+  }, [queryClient]);
 
   // Change password mutation
   const changePasswordMutation = useMutation({
@@ -175,13 +182,41 @@ export const ProfileMenu = () => {
     return null;
   }
 
-  const initials = `${currentUser.first_name?.[0] || ""}${currentUser.last_name?.[0] || ""}`.toUpperCase();
+  // Calculate initials with email fallback
+  const getInitials = () => {
+    // Try first_name + last_name
+    if (currentUser.first_name && currentUser.last_name) {
+      return `${currentUser.first_name[0]}${currentUser.last_name[0]}`.toUpperCase();
+    }
+    
+    // Fallback to email
+    if (currentUser.email) {
+      const localPart = currentUser.email.split('@')[0];
+      const tokens = localPart.split(/[._\-+\s]+/);
+      
+      if (tokens.length >= 2) {
+        return `${tokens[0][0]}${tokens[1][0]}`.toUpperCase();
+      }
+      
+      return localPart.substring(0, 2).toUpperCase();
+    }
+    
+    // Final fallback
+    return "U";
+  };
+
+  const initials = getInitials();
 
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+          <Button 
+            variant="ghost" 
+            className="relative z-40 h-10 w-10 rounded-full pointer-events-auto"
+            aria-label="Användarmeny"
+            title={`${currentUser.first_name || currentUser.email} - Öppna meny`}
+          >
             <Avatar className="h-10 w-10">
               <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
                 {initials}
