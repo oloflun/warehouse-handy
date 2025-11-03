@@ -253,7 +253,7 @@ const Integrations = () => {
   return <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <h1 className="font-extrabold text-4xl">LOGIC WMS</h1>
           
         </div>
         <div className="flex gap-2">
@@ -286,7 +286,7 @@ const Integrations = () => {
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="cursor-pointer" onClick={() => navigate('/inventory')}>
+          <CardHeader onClick={() => navigate('/inventory')} className="cursor-pointer rounded-none">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-primary/10">
@@ -297,23 +297,7 @@ const Integrations = () => {
               <ChevronRight className="h-5 w-5 text-muted-foreground" />
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="cursor-pointer mb-3" onClick={() => navigate('/inventory')}>
-              <p className="text-muted-foreground text-sm mb-2">
-                Visa artiklar i lager med kvantiteter och status
-              </p>
-              <p className="text-2xl font-bold text-primary">
-                {syncStatuses.find(s => s.sync_type === 'inventory_export')?.total_synced || 0}
-              </p>
-              <p className="text-sm text-muted-foreground">artiklar i lager</p>
-            </div>
-            <Button onClick={e => {
-            e.stopPropagation();
-            triggerSync('inventory_export');
-          }} disabled={syncing['inventory_export']} className="w-full" variant="default">
-              {syncing['inventory_export'] ? 'Synkar...' : 'Synka till Sellus'}
-            </Button>
-          </CardContent>
+          
         </Card>
 
         <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/articles')}>
@@ -328,15 +312,7 @@ const Integrations = () => {
               <ChevronRight className="h-5 w-5 text-muted-foreground" />
             </div>
           </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground text-sm mb-2">
-              Hantera alla registrerade artiklar i systemet
-            </p>
-            <p className="text-2xl font-bold text-secondary">
-              {syncStatuses.find(s => s.sync_type === 'product_import')?.total_synced || 0}
-            </p>
-            <p className="text-sm text-muted-foreground">registrerade artiklar</p>
-          </CardContent>
+          
         </Card>
 
         <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/sales')}>
@@ -351,15 +327,7 @@ const Integrations = () => {
               <ChevronRight className="h-5 w-5 text-muted-foreground" />
             </div>
           </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground text-sm mb-2">
-              Visa aktiva ordrar och försäljningsstatus
-            </p>
-            <p className="text-2xl font-bold text-accent">
-              {syncStatuses.find(s => s.sync_type === 'sale_import')?.total_synced || 0}
-            </p>
-            <p className="text-sm text-muted-foreground">synkade ordrar</p>
-          </CardContent>
+          
         </Card>
 
         <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/delivery-notes')}>
@@ -374,16 +342,7 @@ const Integrations = () => {
               <ChevronRight className="h-5 w-5 text-muted-foreground" />
             </div>
           </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground text-sm mb-2">
-              Hantera inleveranser och följesedlar
-            </p>
-            <p className="text-2xl font-bold text-blue-500">
-              {/* Will be replaced with actual count */}
-              <span className="opacity-50">-</span>
-            </p>
-            <p className="text-sm text-muted-foreground">följesedlar</p>
-          </CardContent>
+          
         </Card>
       </div>
 
