@@ -51,19 +51,6 @@ const Index = () => {
     enabled: !!user,
   });
 
-  const { data: syncDiscrepancies } = useQuery({
-    queryKey: ["sellus-sync-discrepancies"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("sellus_sync_discrepancies")
-        .select("*")
-        .eq("resolved", false)
-        .order("created_at", { ascending: false });
-      return data || [];
-    },
-    refetchInterval: 30000,
-    enabled: !!user,
-  });
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -198,41 +185,6 @@ const Index = () => {
         </Alert>
       )}
 
-      {syncDiscrepancies && syncDiscrepancies.length > 0 && (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-5 w-5" />
-          <AlertTitle className="text-lg font-bold">
-            ⚠️ Sellus-synkronisering har avvikelser!
-          </AlertTitle>
-          <AlertDescription className="mt-2">
-            <p className="mb-3">
-              Det finns {syncDiscrepancies.length} avvikelse{syncDiscrepancies.length > 1 ? "r" : ""} mellan systemet och Sellus. 
-              Lagersaldot kanske inte är helt synkat.
-            </p>
-            <div className="space-y-2">
-              {syncDiscrepancies.slice(0, 5).map((discrepancy: any) => (
-                <div key={discrepancy.id} className="p-2 bg-background rounded border border-destructive/20">
-                  <p className="font-medium">
-                    {discrepancy.entity_type === 'inventory' ? '📦 Lagersaldo' : 
-                     discrepancy.entity_type === 'product' ? '🏷️ Artikel' : '📋 Order'}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {discrepancy.discrepancy_type} - {new Date(discrepancy.created_at).toLocaleString("sv-SE")}
-                  </p>
-                </div>
-              ))}
-              {syncDiscrepancies.length > 5 && (
-                <p className="text-sm text-muted-foreground">
-                  ... och {syncDiscrepancies.length - 5} fler avvikelser
-                </p>
-              )}
-            </div>
-            <Button variant="outline" size="sm" className="mt-3" onClick={() => navigate("/integrations")}>
-              Visa alla avvikelser
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
