@@ -9,7 +9,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { RefreshCw, CheckCircle2, XCircle, Clock, Package, List, ShoppingCart, ChevronRight, AlertCircle, Check, QrCode, ClipboardList } from "lucide-react";
-import { ProfileMenu } from "@/components/ProfileMenu";
 import { useIsMobile } from "@/hooks/use-mobile";
 interface SyncStatus {
   id: string;
@@ -263,7 +262,6 @@ const Integrations = () => {
           <Button onClick={fetchData} variant="outline" size="icon">
             <RefreshCw className="h-4 w-4" />
           </Button>
-          <ProfileMenu />
         </div>
       </div>
 

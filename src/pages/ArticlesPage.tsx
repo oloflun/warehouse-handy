@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, RefreshCw, List, Search, CheckCircle2, XCircle } from "lucide-react";
-import { ProfileMenu } from "@/components/ProfileMenu";
 
 interface Article {
   id: string;
@@ -164,7 +163,6 @@ const ArticlesPage = () => {
             <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
             {syncing ? 'Synkroniserar...' : 'Synka från Sellus'}
           </Button>
-          <ProfileMenu />
         </div>
       </div>
 

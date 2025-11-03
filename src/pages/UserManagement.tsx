@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ProfileMenu } from "@/components/ProfileMenu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -80,7 +79,6 @@ const UserManagement = () => {
               <p className="text-muted-foreground">Hantera användare</p>
             </div>
           </div>
-          <ProfileMenu />
         </div>
 
         {/* User list */}

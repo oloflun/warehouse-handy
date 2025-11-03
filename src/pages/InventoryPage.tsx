@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, RefreshCw, Package, AlertTriangle, Search } from "lucide-react";
-import { ProfileMenu } from "@/components/ProfileMenu";
 
 interface InventoryItem {
   id: string;
@@ -143,7 +142,6 @@ const InventoryPage = () => {
           <Button onClick={fetchInventory} variant="outline" size="icon">
             <RefreshCw className="h-4 w-4" />
           </Button>
-          <ProfileMenu />
         </div>
       </div>
 

@@ -7,7 +7,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, CheckCircle2, Clock, AlertCircle } from "lucide-react";
-import { ProfileMenu } from "@/components/ProfileMenu";
 
 interface Order {
   id: string;
@@ -117,7 +116,6 @@ const OrderDetailPage = () => {
             <p className="text-muted-foreground">Orderdetaljer och artiklar</p>
           </div>
         </div>
-        <ProfileMenu />
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
