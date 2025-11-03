@@ -44,25 +44,39 @@ export const ProfileMenu = () => {
   const [inviteEmail, setInviteEmail] = useState("");
 
   // Fetch current user data
-  const { data: currentUser, isLoading } = useQuery<CurrentUser>({
+  const { data: currentUser, isLoading, error } = useQuery<CurrentUser>({
     queryKey: ["current-user-profile"],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
       
+      console.log('Fetching profile for user:', user.id);
+      
       // Fetch profile - use maybeSingle to avoid errors when no profile exists
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("first_name, last_name")
         .eq("id", user.id)
         .maybeSingle();
       
+      if (profileError) {
+        console.error('Profile fetch error:', profileError);
+      }
+      
+      console.log('Profile data:', profile);
+      
       // Fetch role - use maybeSingle to avoid errors when no role exists
-      const { data: roleData } = await supabase
+      const { data: roleData, error: roleError } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id)
         .maybeSingle();
+      
+      if (roleError) {
+        console.error('Role fetch error:', roleError);
+      }
+      
+      console.log('Role data:', roleData);
       
       return {
         id: user.id,
@@ -73,8 +87,16 @@ export const ProfileMenu = () => {
       };
     },
     staleTime: 60_000,
-    refetchOnWindowFocus: false
+    refetchOnWindowFocus: false,
+    retry: 3
   });
+
+  // Log errors
+  useEffect(() => {
+    if (error) {
+      console.error('Profile query error:', error);
+    }
+  }, [error]);
 
   // Invalidate query on auth state changes
   useEffect(() => {
