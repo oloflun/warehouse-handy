@@ -284,67 +284,180 @@ const Integrations = () => {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader onClick={() => navigate('/inventory')} className="cursor-pointer rounded-none">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <Package className="h-6 w-6 text-primary" />
+      {/* Desktop: Två-kolumns layout med navigering och logg */}
+      {!isMobile ? (
+        <div className="grid grid-cols-[320px_1fr] gap-6">
+          {/* Vänster kolumn: Navigationskort */}
+          <div className="space-y-4">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/inventory')}>
+              <CardHeader className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-primary/10">
+                    <Package className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <CardTitle className="text-lg">Lagersaldo</CardTitle>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </div>
-                <CardTitle className="text-xl">Lagersaldo</CardTitle>
-              </div>
-              <ChevronRight className="h-5 w-5 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          
-        </Card>
+              </CardHeader>
+            </Card>
 
-        <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/articles')}>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-secondary/10">
-                  <List className="h-6 w-6 text-secondary" />
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/articles')}>
+              <CardHeader className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-secondary/10">
+                    <List className="h-5 w-5 text-secondary" />
+                  </div>
+                  <div className="flex-1">
+                    <CardTitle className="text-lg">Artiklar</CardTitle>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </div>
-                <CardTitle className="text-xl">Artiklar</CardTitle>
-              </div>
-              <ChevronRight className="h-5 w-5 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          
-        </Card>
+              </CardHeader>
+            </Card>
 
-        <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/sales')}>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-accent/10">
-                  <ShoppingCart className="h-6 w-6 text-accent" />
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/sales')}>
+              <CardHeader className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-accent/10">
+                    <ShoppingCart className="h-5 w-5 text-accent" />
+                  </div>
+                  <div className="flex-1">
+                    <CardTitle className="text-lg">Försäljning</CardTitle>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </div>
-                <CardTitle className="text-xl">Försäljning</CardTitle>
-              </div>
-              <ChevronRight className="h-5 w-5 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          
-        </Card>
+              </CardHeader>
+            </Card>
 
-        <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/delivery-notes')}>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-blue-500/10">
-                  <ClipboardList className="h-6 w-6 text-blue-500" />
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/delivery-notes')}>
+              <CardHeader className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-blue-500/10">
+                    <ClipboardList className="h-5 w-5 text-blue-500" />
+                  </div>
+                  <div className="flex-1">
+                    <CardTitle className="text-lg">Följesedlar</CardTitle>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </div>
-                <CardTitle className="text-xl">Följesedlar</CardTitle>
+              </CardHeader>
+            </Card>
+          </div>
+
+          {/* Höger kolumn: Synkroniseringslogg */}
+          <Card className="h-fit">
+            <CardHeader>
+              <CardTitle>Synkroniseringslogg</CardTitle>
+              <CardDescription>Senaste 50 synkroniseringarna</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="max-h-[calc(100vh-300px)] overflow-y-auto">
+                <Table>
+                  <TableHeader className="sticky top-0 bg-background z-10">
+                    <TableRow>
+                      <TableHead>Tidpunkt</TableHead>
+                      <TableHead>Typ</TableHead>
+                      <TableHead>Riktning</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Varaktighet</TableHead>
+                      <TableHead>Felmeddelande</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {syncLogs.map(log => (
+                      <TableRow key={log.id}>
+                        <TableCell className="font-mono text-sm">
+                          {new Date(log.created_at).toLocaleString('sv-SE')}
+                        </TableCell>
+                        <TableCell>{getSyncTypeLabel(log.sync_type)}</TableCell>
+                        <TableCell>
+                          {log.direction === 'sellus_to_wms' ? '→ WMS' : '→ FDT'}
+                        </TableCell>
+                        <TableCell>
+                          {log.status === 'success' 
+                            ? <CheckCircle2 className="h-4 w-4 text-green-600" /> 
+                            : <XCircle className="h-4 w-4 text-red-600" />
+                          }
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {log.duration_ms}ms
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {log.error_message || '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
-              <ChevronRight className="h-5 w-5 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        /* Mobil: Original 4-korts grid */
+        <div className="grid gap-6 grid-cols-1">
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader onClick={() => navigate('/inventory')} className="cursor-pointer rounded-none">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-primary/10">
+                    <Package className="h-6 w-6 text-primary" />
+                  </div>
+                  <CardTitle className="text-xl">Lagersaldo</CardTitle>
+                </div>
+                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+              </div>
+            </CardHeader>
+          </Card>
+
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/articles')}>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-secondary/10">
+                    <List className="h-6 w-6 text-secondary" />
+                  </div>
+                  <CardTitle className="text-xl">Artiklar</CardTitle>
+                </div>
+                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+              </div>
+            </CardHeader>
+          </Card>
+
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/sales')}>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-accent/10">
+                    <ShoppingCart className="h-6 w-6 text-accent" />
+                  </div>
+                  <CardTitle className="text-xl">Försäljning</CardTitle>
+                </div>
+                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+              </div>
+            </CardHeader>
+          </Card>
+
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/delivery-notes')}>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-blue-500/10">
+                    <ClipboardList className="h-6 w-6 text-blue-500" />
+                  </div>
+                  <CardTitle className="text-xl">Följesedlar</CardTitle>
+                </div>
+                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+              </div>
+            </CardHeader>
+          </Card>
+        </div>
+      )}
 
       {syncFailures && syncFailures.length > 0 && <Alert variant="destructive">
           <AlertCircle className="h-5 w-5" />
@@ -403,49 +516,6 @@ const Integrations = () => {
           </AlertDescription>
         </Alert>}
 
-      {!isMobile && <Card>
-          <CardHeader>
-            <CardTitle>Synkroniseringslogg</CardTitle>
-            <CardDescription>Senaste 50 synkroniseringarna</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tidpunkt</TableHead>
-                  <TableHead>Typ</TableHead>
-                  <TableHead>Riktning</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Varaktighet</TableHead>
-                  <TableHead>Felmeddelande</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {syncLogs.map(log => <TableRow key={log.id}>
-                    <TableCell className="font-mono text-sm">
-                      {new Date(log.created_at).toLocaleString('sv-SE')}
-                    </TableCell>
-                    <TableCell>{getSyncTypeLabel(log.sync_type)}</TableCell>
-                    <TableCell>
-                      {log.direction === 'sellus_to_wms' ? '→ WMS' : '→ FDT'}
-                    </TableCell>
-                    <TableCell>
-                      {log.status === 'success' ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <XCircle className="h-4 w-4 text-red-600" />}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {log.duration_ms}ms
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {log.error_message || '-'}
-                    </TableCell>
-                  </TableRow>)}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>}
     </div>;
 };
 export default Integrations;
