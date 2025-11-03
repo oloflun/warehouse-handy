@@ -47,10 +47,15 @@ Deno.serve(async (req) => {
       throw new Error('Only admins can list users');
     }
 
-    // Fetch all user roles with timestamps
+    // Fetch all user roles with profiles and timestamps
     const { data: roles, error: rolesError } = await supabaseAdmin
       .from('user_roles')
-      .select('user_id, role, created_at')
+      .select(`
+        user_id, 
+        role, 
+        created_at,
+        profiles!inner(first_name, last_name)
+      `)
       .order('created_at', { ascending: false });
 
     if (rolesError) throw rolesError;
@@ -61,12 +66,15 @@ Deno.serve(async (req) => {
 
     if (usersError) throw usersError;
 
-    // Combine role data with user email
-    const usersWithRoles = roles?.map(roleEntry => {
+    // Combine role data with user email and display name
+    const usersWithRoles = roles?.map((roleEntry: any) => {
       const authUser = authUsers?.find(u => u.id === roleEntry.user_id);
+      const profile = roleEntry.profiles;
+      
       return {
         id: roleEntry.user_id,
         email: authUser?.email || 'Unknown',
+        display_name: profile ? `${profile.first_name} ${profile.last_name}` : 'Unknown',
         role: roleEntry.role,
         created_at: roleEntry.created_at,
       };

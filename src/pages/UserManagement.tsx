@@ -16,6 +16,8 @@ const UserManagement = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [role, setRole] = useState<"user" | "admin">("user");
   const [inviting, setInviting] = useState(false);
 
@@ -53,13 +55,20 @@ const UserManagement = () => {
 
     try {
       const { data, error } = await supabase.functions.invoke("invite-user", {
-        body: { email, role },
+        body: { 
+          email, 
+          role,
+          firstName,
+          lastName
+        },
       });
 
       if (error) throw error;
 
-      toast.success(`Inbjudan skickad till ${email}!`);
+      toast.success(`Inbjudan skickad till ${firstName} ${lastName} (${email})!`);
       setEmail("");
+      setFirstName("");
+      setLastName("");
       setRole("user");
       queryClient.invalidateQueries({ queryKey: ["users-with-roles"] });
     } catch (error: any) {
@@ -122,42 +131,66 @@ const UserManagement = () => {
             <form onSubmit={handleInvite} className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="email">E-postadress</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="anvandare@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="pl-10"
-                      required
-                    />
-                  </div>
+                  <Label htmlFor="firstName">Förnamn</Label>
+                  <Input
+                    id="firstName"
+                    type="text"
+                    placeholder="Anton"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="role">Roll</Label>
-                  <Select value={role} onValueChange={(v: "user" | "admin") => setRole(v)}>
-                    <SelectTrigger id="role">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="user">
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4" />
-                          Användare
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="admin">
-                        <div className="flex items-center gap-2">
-                          <Shield className="h-4 w-4" />
-                          Admin
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="lastName">Efternamn</Label>
+                  <Input
+                    id="lastName"
+                    type="text"
+                    placeholder="Lundin"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
+                  />
                 </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="email">E-postadress</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="anvandare@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="pl-10"
+                    required
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="role">Roll</Label>
+                <Select value={role} onValueChange={(v: "user" | "admin") => setRole(v)}>
+                  <SelectTrigger id="role">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        Användare
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="admin">
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-4 w-4" />
+                        Admin
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <Button type="submit" disabled={inviting}>
                 {inviting ? (
@@ -193,7 +226,8 @@ const UserManagement = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Användare</TableHead>
+                    <TableHead>Namn</TableHead>
+                    <TableHead>E-post</TableHead>
                     <TableHead>Roll</TableHead>
                     <TableHead>Skapad</TableHead>
                   </TableRow>
@@ -201,7 +235,15 @@ const UserManagement = () => {
                 <TableBody>
                   {users?.map((user: any) => (
                     <TableRow key={user.id}>
-                      <TableCell className="font-medium">{user.email}</TableCell>
+                      <TableCell className="font-medium">
+                        {user.display_name}
+                        {user.role === "admin" && (
+                          <Badge variant="outline" className="ml-2">Admin</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {user.email}
+                      </TableCell>
                       <TableCell>
                         {user.role === "admin" ? (
                           <Badge variant="default" className="gap-1">
