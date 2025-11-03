@@ -165,7 +165,13 @@ export const ProfileMenu = () => {
     inviteUserMutation.mutate();
   };
 
-  if (isLoading || !currentUser) {
+  if (isLoading) {
+    return (
+      <div className="h-10 w-10 rounded-full bg-muted animate-pulse" />
+    );
+  }
+
+  if (!currentUser) {
     return null;
   }
 

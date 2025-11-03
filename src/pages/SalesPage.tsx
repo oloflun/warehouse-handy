@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, RefreshCw, ShoppingCart, ChevronRight } from "lucide-react";
+import { ProfileMenu } from "@/components/ProfileMenu";
 
 interface OrderSummary {
   id: string;
@@ -135,6 +136,7 @@ const SalesPage = () => {
           <Button onClick={fetchOrders} variant="outline" size="icon">
             <RefreshCw className="h-4 w-4" />
           </Button>
+          <ProfileMenu />
         </div>
       </div>
 

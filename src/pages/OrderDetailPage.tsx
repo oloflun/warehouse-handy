@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, CheckCircle2, Clock, AlertCircle } from "lucide-react";
+import { ProfileMenu } from "@/components/ProfileMenu";
 
 interface Order {
   id: string;
@@ -106,14 +107,17 @@ const OrderDetailPage = () => {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/sales')}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold">Order #{order.order_number || order.fdt_order_id}</h1>
-          <p className="text-muted-foreground">Orderdetaljer och artiklar</p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/sales')}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold">Order #{order.order_number || order.fdt_order_id}</h1>
+            <p className="text-muted-foreground">Orderdetaljer och artiklar</p>
+          </div>
         </div>
+        <ProfileMenu />
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
