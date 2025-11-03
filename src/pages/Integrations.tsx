@@ -10,7 +10,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { RefreshCw, CheckCircle2, XCircle, Clock, Package, List, ShoppingCart, ChevronRight, AlertCircle, Check, QrCode, ClipboardList } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
-
 interface SyncStatus {
   id: string;
   sync_type: string;
@@ -20,7 +19,6 @@ interface SyncStatus {
   total_errors: number;
   is_enabled: boolean;
 }
-
 interface SyncLog {
   id: string;
   sync_type: string;
@@ -30,60 +28,65 @@ interface SyncLog {
   created_at: string;
   duration_ms: number;
 }
-
 const Integrations = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const {
+    toast
+  } = useToast();
   const [syncStatuses, setSyncStatuses] = useState<SyncStatus[]>([]);
   const [syncLogs, setSyncLogs] = useState<SyncLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState<Record<string, boolean>>({});
   const [user, setUser] = useState<any>(null);
   const isMobile = useIsMobile();
-
-  const { data: syncFailures, refetch: refetchFailures } = useQuery({
+  const {
+    data: syncFailures,
+    refetch: refetchFailures
+  } = useQuery({
     queryKey: ['sellus-sync-failures'],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('sellus_sync_failures')
-        .select('*')
-        .is('resolved_at', null)
-        .order('created_at', { ascending: false });
+      const {
+        data
+      } = await supabase.from('sellus_sync_failures').select('*').is('resolved_at', null).order('created_at', {
+        ascending: false
+      });
       return data || [];
     },
     refetchInterval: 30000,
-    enabled: !!user,
+    enabled: !!user
   });
-
-  const { data: syncDiscrepancies } = useQuery({
+  const {
+    data: syncDiscrepancies
+  } = useQuery({
     queryKey: ['sellus-sync-discrepancies'],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('sellus_sync_discrepancies')
-        .select('*')
-        .eq('resolved', false)
-        .order('severity', { ascending: false })
-        .order('created_at', { ascending: false });
+      const {
+        data
+      } = await supabase.from('sellus_sync_discrepancies').select('*').eq('resolved', false).order('severity', {
+        ascending: false
+      }).order('created_at', {
+        ascending: false
+      });
       return data || [];
     },
     refetchInterval: 30000,
-    enabled: !!user,
+    enabled: !!user
   });
-
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({
+      data: {
+        session
+      }
+    }) => {
       setUser(session?.user || null);
     });
     fetchData();
   }, []);
-
   const fetchData = async () => {
     try {
-      const [statusRes, logsRes] = await Promise.all([
-        supabase.from('fdt_sync_status').select('*').order('sync_type'),
-        supabase.from('fdt_sync_log').select('*').order('created_at', { ascending: false }).limit(50)
-      ]);
-
+      const [statusRes, logsRes] = await Promise.all([supabase.from('fdt_sync_status').select('*').order('sync_type'), supabase.from('fdt_sync_log').select('*').order('created_at', {
+        ascending: false
+      }).limit(50)]);
       if (statusRes.data) setSyncStatuses(statusRes.data);
       if (logsRes.data) setSyncLogs(logsRes.data);
     } catch (error) {
@@ -92,35 +95,34 @@ const Integrations = () => {
       setLoading(false);
     }
   };
-
   const triggerSync = async (syncType: string) => {
-    setSyncing(prev => ({ ...prev, [syncType]: true }));
+    setSyncing(prev => ({
+      ...prev,
+      [syncType]: true
+    }));
     try {
       const functionMap: Record<string, string> = {
         'product_import': 'sync-products-from-sellus',
         'inventory_export': 'sync-inventory-to-sellus',
-        'sale_import': 'sync-sales-from-retail',
+        'sale_import': 'sync-sales-from-retail'
       };
-
-      const { data, error } = await supabase.functions.invoke(functionMap[syncType]);
-
+      const {
+        data,
+        error
+      } = await supabase.functions.invoke(functionMap[syncType]);
       if (error) throw error;
-
-      const successMsg = data?.synced !== undefined 
-        ? `Synkroniserade ${data.synced} poster${data.errors > 0 ? ` (${data.errors} fel)` : ''}`
-        : 'Synkronisering slutförd';
-
+      const successMsg = data?.synced !== undefined ? `Synkroniserade ${data.synced} poster${data.errors > 0 ? ` (${data.errors} fel)` : ''}` : 'Synkronisering slutförd';
       toast({
         title: "Synkronisering slutförd",
         description: successMsg,
-        variant: data?.errors > 0 ? "destructive" : "default",
+        variant: data?.errors > 0 ? "destructive" : "default"
       });
 
       // Wait a bit before refreshing to ensure database is updated
       setTimeout(fetchData, 1000);
     } catch (error: any) {
       let errorMsg = error.message || 'Okänt fel uppstod';
-      
+
       // If error.context is a Response object, try to extract details
       if (error.context && typeof error.context === 'object') {
         try {
@@ -139,43 +141,46 @@ const Integrations = () => {
           console.error('Failed to parse error context:', e);
         }
       }
-      
       toast({
         title: "Synkroniseringsfel",
         description: errorMsg,
-        variant: "destructive",
+        variant: "destructive"
       });
-      
       console.error('Sync error details:', error);
     } finally {
-      setSyncing(prev => ({ ...prev, [syncType]: false }));
+      setSyncing(prev => ({
+        ...prev,
+        [syncType]: false
+      }));
     }
   };
-
   const retryFailedSync = async (failure: any) => {
     if (!failure.product_id) {
       toast({
         title: "Fel",
         description: "Ingen produkt-ID hittades för att försöka igen",
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
-
-    setSyncing(prev => ({ ...prev, [`retry-${failure.id}`]: true }));
+    setSyncing(prev => ({
+      ...prev,
+      [`retry-${failure.id}`]: true
+    }));
     try {
-      const { data, error } = await supabase.functions.invoke('update-sellus-stock', {
+      const {
+        data,
+        error
+      } = await supabase.functions.invoke('update-sellus-stock', {
         body: {
           productId: failure.product_id,
-          quantity: failure.quantity_changed,
+          quantity: failure.quantity_changed
         }
       });
-
       if (error) throw error;
-
       toast({
         title: "Försök igen lyckades",
-        description: `Lagersaldo för ${failure.product_name} har uppdaterats i Sellus`,
+        description: `Lagersaldo för ${failure.product_name} har uppdaterats i Sellus`
       });
 
       // Refresh data
@@ -187,48 +192,54 @@ const Integrations = () => {
       toast({
         title: "Försök igen misslyckades",
         description: error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
-      setSyncing(prev => ({ ...prev, [`retry-${failure.id}`]: false }));
+      setSyncing(prev => ({
+        ...prev,
+        [`retry-${failure.id}`]: false
+      }));
     }
   };
-
   const resolveAllItemIds = async () => {
-    setSyncing(prev => ({ ...prev, 'resolve-ids': true }));
+    setSyncing(prev => ({
+      ...prev,
+      'resolve-ids': true
+    }));
     try {
-      const { data, error } = await supabase.functions.invoke('resolve-sellus-item-ids', {
+      const {
+        data,
+        error
+      } = await supabase.functions.invoke('resolve-sellus-item-ids', {
         body: {}
       });
-
       if (error) throw error;
-
       toast({
         title: "Verifiering slutförd",
-        description: `${data.resolved} artiklar verifierade, ${data.failed} misslyckades`,
+        description: `${data.resolved} artiklar verifierade, ${data.failed} misslyckades`
       });
-
       setTimeout(fetchData, 1000);
     } catch (error: any) {
       toast({
         title: "Fel vid verifiering",
         description: error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
-      setSyncing(prev => ({ ...prev, 'resolve-ids': false }));
+      setSyncing(prev => ({
+        ...prev,
+        'resolve-ids': false
+      }));
     }
   };
-
   const getSyncTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
       'product_import': 'Artiklar',
       'inventory_export': 'Lagersaldo till Sellus',
-      'sale_import': 'Försäljning',
+      'sale_import': 'Försäljning'
     };
     return labels[type] || type;
   };
-
   const getStatusColor = (status: SyncStatus) => {
     if (!status.last_successful_sync) return 'secondary';
     const hoursSinceSync = (Date.now() - new Date(status.last_successful_sync).getTime()) / (1000 * 60 * 60);
@@ -236,59 +247,37 @@ const Integrations = () => {
     if (hoursSinceSync > 24) return 'secondary';
     return 'default';
   };
-
   if (loading) {
     return <div className="container mx-auto p-6">Laddar...</div>;
   }
-
-  return (
-    <div className="container mx-auto p-6 space-y-6">
+  return <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">FDT Integration</h1>
-          <p className="text-muted-foreground">Hantera synkronisering med FDT Sellus & Excellence Retail</p>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          
         </div>
         <div className="flex gap-2">
-          {isMobile ? (
-            <>
-              <Button 
-                onClick={() => navigate('/scanner')}
-                variant="default"
-                className="flex items-center gap-2"
-              >
+          {isMobile ? <>
+              <Button onClick={() => navigate('/scanner')} variant="default" className="flex items-center gap-2">
                 <QrCode className="h-4 w-4" />
                 Scanner
               </Button>
-              <Button 
-                onClick={() => navigate('/delivery-notes')}
-                variant="secondary"
-                className="flex items-center gap-2"
-              >
+              <Button onClick={() => navigate('/delivery-notes')} variant="secondary" className="flex items-center gap-2">
                 <ClipboardList className="h-4 w-4" />
                 Följesedlar
               </Button>
-            </>
-          ) : (
-            <>
-              <Button 
-                onClick={() => navigate('/delivery-notes')}
-                variant="default"
-              >
+            </> : <>
+              <Button onClick={() => navigate('/delivery-notes')} variant="default">
                 <ClipboardList className="h-4 w-4 mr-2" />
                 Följesedlar
               </Button>
-              <Button 
-                onClick={resolveAllItemIds}
-                disabled={syncing['resolve-ids']}
-                variant="secondary"
-              >
+              <Button onClick={resolveAllItemIds} disabled={syncing['resolve-ids']} variant="secondary">
                 {syncing['resolve-ids'] ? 'Verifierar...' : 'Verifiera artikelkopplingar'}
               </Button>
               <Button onClick={() => navigate('/fdt-explorer')} variant="outline">
                 API Explorer
               </Button>
-            </>
-          )}
+            </>}
           <Button onClick={fetchData} variant="outline" size="icon">
             <RefreshCw className="h-4 w-4" />
           </Button>
@@ -297,10 +286,7 @@ const Integrations = () => {
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader 
-            className="cursor-pointer"
-            onClick={() => navigate('/inventory')}
-          >
+          <CardHeader className="cursor-pointer" onClick={() => navigate('/inventory')}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-primary/10">
@@ -312,10 +298,7 @@ const Integrations = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div 
-              className="cursor-pointer mb-3"
-              onClick={() => navigate('/inventory')}
-            >
+            <div className="cursor-pointer mb-3" onClick={() => navigate('/inventory')}>
               <p className="text-muted-foreground text-sm mb-2">
                 Visa artiklar i lager med kvantiteter och status
               </p>
@@ -324,24 +307,16 @@ const Integrations = () => {
               </p>
               <p className="text-sm text-muted-foreground">artiklar i lager</p>
             </div>
-            <Button 
-              onClick={(e) => {
-                e.stopPropagation();
-                triggerSync('inventory_export');
-              }}
-              disabled={syncing['inventory_export']}
-              className="w-full"
-              variant="default"
-            >
+            <Button onClick={e => {
+            e.stopPropagation();
+            triggerSync('inventory_export');
+          }} disabled={syncing['inventory_export']} className="w-full" variant="default">
               {syncing['inventory_export'] ? 'Synkar...' : 'Synka till Sellus'}
             </Button>
           </CardContent>
         </Card>
 
-        <Card 
-          className="cursor-pointer hover:shadow-lg transition-shadow"
-          onClick={() => navigate('/articles')}
-        >
+        <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/articles')}>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -364,10 +339,7 @@ const Integrations = () => {
           </CardContent>
         </Card>
 
-        <Card 
-          className="cursor-pointer hover:shadow-lg transition-shadow"
-          onClick={() => navigate('/sales')}
-        >
+        <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/sales')}>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -390,10 +362,7 @@ const Integrations = () => {
           </CardContent>
         </Card>
 
-        <Card 
-          className="cursor-pointer hover:shadow-lg transition-shadow"
-          onClick={() => navigate('/delivery-notes')}
-        >
+        <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/delivery-notes')}>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -418,8 +387,7 @@ const Integrations = () => {
         </Card>
       </div>
 
-      {syncFailures && syncFailures.length > 0 && (
-        <Alert variant="destructive">
+      {syncFailures && syncFailures.length > 0 && <Alert variant="destructive">
           <AlertCircle className="h-5 w-5" />
           <AlertTitle className="text-lg font-bold">
             Misslyckade Sellus-synkningar
@@ -429,8 +397,7 @@ const Integrations = () => {
               Följande produkter har plockats men kunde inte synkas till Sellus. Uppdatera manuellt i Sellus och markera som löst:
             </p>
             <div className="space-y-2">
-              {syncFailures.map((failure: any) => (
-                <div key={failure.id} className="flex items-center justify-between p-3 bg-background rounded border">
+              {syncFailures.map((failure: any) => <div key={failure.id} className="flex items-center justify-between p-3 bg-background rounded border">
                   <div className="flex-1">
                     <p className="font-medium">{failure.product_name}</p>
                     <p className="text-sm text-muted-foreground">
@@ -444,54 +411,40 @@ const Integrations = () => {
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="default"
-                      onClick={() => retryFailedSync(failure)}
-                      disabled={syncing[`retry-${failure.id}`]}
-                    >
+                    <Button size="sm" variant="default" onClick={() => retryFailedSync(failure)} disabled={syncing[`retry-${failure.id}`]}>
                       {syncing[`retry-${failure.id}`] ? 'Försöker...' : 'Försök igen'}
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={async () => {
-                        const { error } = await supabase
-                          .from('sellus_sync_failures')
-                          .update({ 
-                            resolved_at: new Date().toISOString(),
-                            resolved_by: user?.id 
-                          })
-                          .eq('id', failure.id);
-                        
-                        if (error) {
-                          toast({
-                            title: "Fel",
-                            description: "Kunde inte markera som löst",
-                            variant: "destructive",
-                          });
-                        } else {
-                          toast({
-                            title: "Markerad som löst",
-                            description: "Synkfelet har markerats som åtgärdat",
-                          });
-                          refetchFailures();
-                        }
-                      }}
-                    >
+                    <Button size="sm" variant="outline" onClick={async () => {
+                const {
+                  error
+                } = await supabase.from('sellus_sync_failures').update({
+                  resolved_at: new Date().toISOString(),
+                  resolved_by: user?.id
+                }).eq('id', failure.id);
+                if (error) {
+                  toast({
+                    title: "Fel",
+                    description: "Kunde inte markera som löst",
+                    variant: "destructive"
+                  });
+                } else {
+                  toast({
+                    title: "Markerad som löst",
+                    description: "Synkfelet har markerats som åtgärdat"
+                  });
+                  refetchFailures();
+                }
+              }}>
                       <Check className="w-4 h-4 mr-2" />
                       Markera som löst
                     </Button>
                   </div>
-                </div>
-              ))}
+                </div>)}
             </div>
           </AlertDescription>
-        </Alert>
-      )}
+        </Alert>}
 
-      {!isMobile && (
-        <Card>
+      {!isMobile && <Card>
           <CardHeader>
             <CardTitle>Synkroniseringslogg</CardTitle>
             <CardDescription>Senaste 50 synkroniseringarna</CardDescription>
@@ -509,8 +462,7 @@ const Integrations = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {syncLogs.map((log) => (
-                  <TableRow key={log.id}>
+                {syncLogs.map(log => <TableRow key={log.id}>
                     <TableCell className="font-mono text-sm">
                       {new Date(log.created_at).toLocaleString('sv-SE')}
                     </TableCell>
@@ -519,11 +471,7 @@ const Integrations = () => {
                       {log.direction === 'sellus_to_wms' ? '→ WMS' : '→ FDT'}
                     </TableCell>
                     <TableCell>
-                      {log.status === 'success' ? (
-                        <CheckCircle2 className="h-4 w-4 text-green-600" />
-                      ) : (
-                        <XCircle className="h-4 w-4 text-red-600" />
-                      )}
+                      {log.status === 'success' ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <XCircle className="h-4 w-4 text-red-600" />}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
@@ -534,15 +482,11 @@ const Integrations = () => {
                     <TableCell className="text-sm text-muted-foreground">
                       {log.error_message || '-'}
                     </TableCell>
-                  </TableRow>
-                ))}
+                  </TableRow>)}
               </TableBody>
             </Table>
           </CardContent>
-        </Card>
-      )}
-    </div>
-  );
+        </Card>}
+    </div>;
 };
-
 export default Integrations;
