@@ -8,7 +8,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
-import { RefreshCw, CheckCircle2, XCircle, Clock, Package, List, ShoppingCart, ChevronRight, AlertCircle, Check, QrCode, ClipboardList, UserPlus } from "lucide-react";
+import { RefreshCw, CheckCircle2, XCircle, Clock, Package, List, ShoppingCart, ChevronRight, AlertCircle, Check, QrCode, ClipboardList } from "lucide-react";
+import { ProfileMenu } from "@/components/ProfileMenu";
 import { useIsMobile } from "@/hooks/use-mobile";
 interface SyncStatus {
   id: string;
@@ -53,23 +54,6 @@ const Integrations = () => {
     enabled: !!user
   });
 
-  // Check if user is admin
-  const { data: userRole } = useQuery({
-    queryKey: ["user-role"],
-    queryFn: async () => {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (!currentUser) return null;
-      
-      const { data } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", currentUser.id)
-        .single();
-      
-      return data?.role;
-    },
-    enabled: !!user,
-  });
   useEffect(() => {
     supabase.auth.getSession().then(({
       data: {
@@ -275,16 +259,11 @@ const Integrations = () => {
               <Button onClick={() => navigate('/fdt-explorer')} variant="outline">
                 API Explorer
               </Button>
-              {userRole === "admin" && (
-                <Button onClick={() => navigate('/user-management')} variant="outline">
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Användare
-                </Button>
-              )}
             </>}
           <Button onClick={fetchData} variant="outline" size="icon">
             <RefreshCw className="h-4 w-4" />
           </Button>
+          <ProfileMenu />
         </div>
       </div>
 

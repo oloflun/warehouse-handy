@@ -8,7 +8,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Package, Scan, TrendingUp, TrendingDown, LogOut, AlertTriangle, CheckCircle, AlertCircle } from "lucide-react";
+import { Package, Scan, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, AlertCircle } from "lucide-react";
+import { ProfileMenu } from "@/components/ProfileMenu";
 
 interface InventoryItem {
   id: string;
@@ -128,10 +129,6 @@ const Index = () => {
     });
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate("/auth");
-  };
 
   const getStockStatus = (item: InventoryItem) => {
     if (item.quantity === 0) {
@@ -153,10 +150,7 @@ const Index = () => {
           </h1>
           <p className="text-muted-foreground mt-1">Välkommen, {user?.email}</p>
         </div>
-        <Button variant="outline" onClick={handleLogout}>
-          <LogOut className="w-4 h-4 mr-2" />
-          Logga ut
-        </Button>
+        <ProfileMenu />
       </div>
 
       {syncFailures && syncFailures.length > 0 && (

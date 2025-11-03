@@ -1,25 +1,16 @@
-import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ProfileMenu } from "@/components/ProfileMenu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ArrowLeft, UserPlus, Shield, User, Mail, Loader2 } from "lucide-react";
+import { ArrowLeft, Shield, User, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const UserManagement = () => {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const [email, setEmail] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [role, setRole] = useState<"user" | "admin">("user");
-  const [inviting, setInviting] = useState(false);
 
   // Check if user is admin
   const { data: currentUser } = useQuery({
@@ -49,34 +40,6 @@ const UserManagement = () => {
     enabled: currentUser?.role === "admin",
   });
 
-  const handleInvite = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setInviting(true);
-
-    try {
-      const { data, error } = await supabase.functions.invoke("invite-user", {
-        body: { 
-          email, 
-          role,
-          firstName,
-          lastName
-        },
-      });
-
-      if (error) throw error;
-
-      toast.success(`Inbjudan skickad till ${firstName} ${lastName} (${email})!`);
-      setEmail("");
-      setFirstName("");
-      setLastName("");
-      setRole("user");
-      queryClient.invalidateQueries({ queryKey: ["users-with-roles"] });
-    } catch (error: any) {
-      toast.error(error.message || "Kunde inte skicka inbjudan");
-    } finally {
-      setInviting(false);
-    }
-  };
 
   // Check admin permission
   if (!currentUser || currentUser.role !== "admin") {
@@ -114,100 +77,11 @@ const UserManagement = () => {
             </Button>
             <div>
               <h1 className="text-3xl font-bold">Användarhantering</h1>
-              <p className="text-muted-foreground">Bjud in och hantera användare</p>
+              <p className="text-muted-foreground">Hantera användare</p>
             </div>
           </div>
+          <ProfileMenu />
         </div>
-
-        {/* Invitation form */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Bjud in ny användare</CardTitle>
-            <CardDescription>
-              Skicka en inbjudan via email. Användaren får en länk för att skapa sitt lösenord.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleInvite} className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">Förnamn</Label>
-                  <Input
-                    id="firstName"
-                    type="text"
-                    placeholder="Anton"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Efternamn</Label>
-                  <Input
-                    id="lastName"
-                    type="text"
-                    placeholder="Lundin"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="email">E-postadress</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="anvandare@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10"
-                    required
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="role">Roll</Label>
-                <Select value={role} onValueChange={(v: "user" | "admin") => setRole(v)}>
-                  <SelectTrigger id="role">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="user">
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4" />
-                        Användare
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="admin">
-                      <div className="flex items-center gap-2">
-                        <Shield className="h-4 w-4" />
-                        Admin
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button type="submit" disabled={inviting}>
-                {inviting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Skickar inbjudan...
-                  </>
-                ) : (
-                  <>
-                    <UserPlus className="mr-2 h-4 w-4" />
-                    Skicka inbjudan
-                  </>
-                )}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
 
         {/* User list */}
         <Card>
