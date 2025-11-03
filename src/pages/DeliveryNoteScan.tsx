@@ -214,7 +214,7 @@ export default function DeliveryNoteScan() {
         
         toast({
           title: "Följesedel skapad!",
-          description: `${data.items.length} artiklar hittades`,
+          description: `${data.items.length} ${data.items.length === 1 ? 'träff' : 'träffar'}`,
         });
       } else if (scanMode === 'article') {
         console.log('Analyzing article label...');
@@ -237,8 +237,8 @@ export default function DeliveryNoteScan() {
       toast({
         title: "Fel",
         description: scanMode === 'delivery-note' 
-          ? "Kunde inte analysera följesedeln" 
-          : "Kunde inte analysera etiketten",
+          ? "Kunde inte scanna följesedeln" 
+          : "Kunde inte scanna etiketten",
         variant: "destructive",
       });
     } finally {
@@ -675,7 +675,7 @@ export default function DeliveryNoteScan() {
               }}
             >
               <Camera className="mr-2 h-6 w-6" />
-              Scanna med AI (rekommenderat)
+              Scanna etikett
             </Button>
             <Button
               variant="outline"
