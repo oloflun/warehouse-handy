@@ -4,10 +4,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Camera, CheckCircle2, Loader2 } from "lucide-react";
+import { ArrowLeft, Camera, CheckCircle2, Loader2, ScanLine, Plus, QrCode } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Html5Qrcode } from "html5-qrcode";
 import { DeliveryNoteItemCard } from "@/components/DeliveryNoteItemCard";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 interface DeliveryNoteItem {
   id: string;
@@ -33,6 +41,10 @@ export default function DeliveryNoteScan() {
   const [deliveryNoteNumber, setDeliveryNoteNumber] = useState("");
   const [cargoMarking, setCargoMarking] = useState("");
   const [items, setItems] = useState<DeliveryNoteItem[]>([]);
+  const [scanMode, setScanMode] = useState<'delivery-note' | 'article' | null>(null);
+  const [showManualEntry, setShowManualEntry] = useState(false);
+  const [manualArticleNumber, setManualArticleNumber] = useState("");
+  const [showScanOptions, setShowScanOptions] = useState(false);
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -79,9 +91,10 @@ export default function DeliveryNoteScan() {
     }
   };
 
-  const startCamera = async () => {
+  const startCamera = async (mode: 'delivery-note' | 'article' = 'delivery-note') => {
     try {
-      console.log('Starting camera...');
+      console.log('Starting camera for mode:', mode);
+      setScanMode(mode);
       setCameraLoading(true);
       setCameraActive(true);
       
@@ -149,6 +162,7 @@ export default function DeliveryNoteScan() {
     }
     setCameraActive(false);
     setCameraLoading(false);
+    setScanMode(null);
   };
 
   const captureAndAnalyze = async () => {
@@ -182,30 +196,49 @@ export default function DeliveryNoteScan() {
       ctx.drawImage(videoRef.current, 0, 0);
       const imageData = canvas.toDataURL('image/jpeg', 0.8);
 
-      console.log('Analyzing delivery note...');
-      
-      const { data, error } = await supabase.functions.invoke('analyze-delivery-note', {
-        body: { imageData }
-      });
+      if (scanMode === 'delivery-note') {
+        console.log('Analyzing delivery note...');
+        
+        const { data, error } = await supabase.functions.invoke('analyze-delivery-note', {
+          body: { imageData }
+        });
 
-      if (error) throw error;
+        if (error) throw error;
 
-      console.log('Analysis result:', data);
+        console.log('Analysis result:', data);
 
-      // Create delivery note and items
-      await createDeliveryNote(data);
-      
-      stopCamera();
-      
-      toast({
-        title: "Följesedel skapad!",
-        description: `${data.items.length} artiklar hittades`,
-      });
+        // Create delivery note and items
+        await createDeliveryNote(data);
+        
+        stopCamera();
+        
+        toast({
+          title: "Följesedel skapad!",
+          description: `${data.items.length} ${data.items.length === 1 ? 'träff' : 'träffar'}`,
+        });
+      } else if (scanMode === 'article') {
+        console.log('Analyzing article label...');
+        
+        const { data, error } = await supabase.functions.invoke('analyze-label', {
+          body: { image: imageData }
+        });
+
+        if (error) throw error;
+
+        console.log('Label analysis result:', data);
+
+        // Find and check off matching article
+        await checkOffArticle(data);
+        
+        stopCamera();
+      }
     } catch (error) {
-      console.error('Error analyzing delivery note:', error);
+      console.error('Error analyzing:', error);
       toast({
         title: "Fel",
-        description: "Kunde inte analysera följesedeln",
+        description: scanMode === 'delivery-note' 
+          ? "Kunde inte scanna följesedeln" 
+          : "Kunde inte scanna etiketten",
         variant: "destructive",
       });
     } finally {
@@ -255,6 +288,100 @@ export default function DeliveryNoteScan() {
       console.error('Error creating delivery note:', error);
       throw error;
     }
+  };
+
+  const checkOffArticle = async (labelData: any) => {
+    if (!deliveryNoteId) {
+      toast({
+        title: "Fel",
+        description: "Ingen följesedel vald",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Try to find matching article by article number
+    const articleNumbers = labelData.article_numbers || [];
+    
+    if (articleNumbers.length === 0) {
+      toast({
+        title: "Ingen artikel hittad",
+        description: "Kunde inte hitta något artikelnummer på etiketten",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Try each article number to find a match
+    let matchedItem = null;
+    for (const articleNumber of articleNumbers) {
+      matchedItem = items.find(item => 
+        !item.is_checked && 
+        item.article_number.toLowerCase().includes(articleNumber.toLowerCase())
+      );
+      if (matchedItem) break;
+    }
+
+    if (!matchedItem) {
+      toast({
+        title: "Artikel ej på följesedel",
+        description: `Kunde inte hitta artikel ${articleNumbers[0]} på denna följesedel`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check off the matched item
+    await handleCheckItem(matchedItem.id, true);
+    
+    toast({
+      title: "Artikel avcheckad!",
+      description: `${matchedItem.article_number} har checkats av`,
+    });
+  };
+
+  const handleManualEntry = async () => {
+    if (!manualArticleNumber.trim()) {
+      toast({
+        title: "Fel",
+        description: "Ange ett artikelnummer",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!deliveryNoteId) {
+      toast({
+        title: "Fel",
+        description: "Ingen följesedel vald",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const matchedItem = items.find(item => 
+      !item.is_checked && 
+      item.article_number.toLowerCase() === manualArticleNumber.toLowerCase()
+    );
+
+    if (!matchedItem) {
+      toast({
+        title: "Artikel ej på följesedel",
+        description: `Kunde inte hitta artikel ${manualArticleNumber} på denna följesedel`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    await handleCheckItem(matchedItem.id, true);
+    
+    toast({
+      title: "Artikel avcheckad!",
+      description: `${matchedItem.article_number} har checkats av`,
+    });
+
+    setManualArticleNumber("");
+    setShowManualEntry(false);
   };
 
   const handleQuantityChange = async (itemId: string, newQuantity: number) => {
@@ -427,63 +554,73 @@ export default function DeliveryNoteScan() {
         </div>
 
         {/* Camera View */}
-        {!deliveryNoteId && (
+        {cameraActive && (
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                {scanMode === 'delivery-note' ? 'Scanna följesedel' : 'Scanna artikel'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full rounded-lg bg-black min-h-[300px]"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    onClick={captureAndAnalyze}
+                    disabled={analyzing}
+                    className="flex-1"
+                  >
+                    {analyzing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Analyserar...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                        Fånga bild
+                      </>
+                    )}
+                  </Button>
+                  <Button variant="outline" onClick={stopCamera}>
+                    Avbryt
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Initial Scan Prompt */}
+        {!deliveryNoteId && !cameraActive && (
           <Card>
             <CardHeader>
               <CardTitle>Scanna följesedel</CardTitle>
             </CardHeader>
             <CardContent>
-              {cameraActive ? (
-                <div className="space-y-4">
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="w-full rounded-lg bg-black min-h-[300px]"
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={captureAndAnalyze}
-                      disabled={analyzing}
-                      className="flex-1"
-                    >
-                      {analyzing ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Analyserar...
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="mr-2 h-4 w-4" />
-                          Fånga bild
-                        </>
-                      )}
-                    </Button>
-                    <Button variant="outline" onClick={stopCamera}>
-                      Avbryt
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <Button 
-                  onClick={startCamera} 
-                  className="w-full"
-                  disabled={cameraLoading}
-                >
-                  {cameraLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Startar kamera...
-                    </>
-                  ) : (
-                    <>
-                      <Camera className="mr-2 h-4 w-4" />
-                      Starta kamera
-                    </>
-                  )}
-                </Button>
-              )}
+              <Button 
+                onClick={() => startCamera('delivery-note')} 
+                className="w-full"
+                disabled={cameraLoading}
+              >
+                {cameraLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Startar kamera...
+                  </>
+                ) : (
+                  <>
+                    <Camera className="mr-2 h-4 w-4" />
+                    Starta kamera
+                  </>
+                )}
+              </Button>
             </CardContent>
           </Card>
         )}
@@ -510,14 +647,83 @@ export default function DeliveryNoteScan() {
           <Button
             size="lg"
             className="w-full shadow-lg"
-            onClick={startCamera}
+            onClick={() => setShowScanOptions(true)}
             disabled={cameraActive}
           >
-            <Camera className="mr-2 h-5 w-5" />
+            <ScanLine className="mr-2 h-5 w-5" />
             Scanna artikel
           </Button>
         </div>
       )}
+
+      {/* Scan Options Dialog */}
+      <Dialog open={showScanOptions} onOpenChange={setShowScanOptions}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Scanna artikel</DialogTitle>
+            <DialogDescription>
+              Välj metod för att lägga till artikel på följesedeln
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Button
+              variant="outline"
+              className="w-full h-16 text-lg"
+              onClick={() => {
+                setShowScanOptions(false);
+                startCamera('article');
+              }}
+            >
+              <Camera className="mr-2 h-6 w-6" />
+              Scanna etikett
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full h-16 text-lg"
+              onClick={() => {
+                setShowScanOptions(false);
+                setShowManualEntry(true);
+              }}
+            >
+              <Plus className="mr-2 h-6 w-6" />
+              Ange artikelnummer manuellt
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manual Entry Dialog */}
+      <Dialog open={showManualEntry} onOpenChange={setShowManualEntry}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ange artikelnummer</DialogTitle>
+            <DialogDescription>
+              Skriv in artikelnumret manuellt
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              placeholder="Artikelnummer"
+              value={manualArticleNumber}
+              onChange={(e) => setManualArticleNumber(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleManualEntry();
+                }
+              }}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowManualEntry(false)}>
+              Avbryt
+            </Button>
+            <Button onClick={handleManualEntry}>
+              Bekräfta
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

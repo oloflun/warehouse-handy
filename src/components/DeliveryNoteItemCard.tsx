@@ -48,11 +48,15 @@ export const DeliveryNoteItemCard = ({
     setIsEditingQuantity(false);
   };
 
+  const quantityDiffers = item.quantity_checked !== item.quantity_expected && item.is_checked;
+
   return (
     <Card 
       className={`p-4 transition-colors ${
         item.is_checked 
-          ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800' 
+          ? quantityDiffers
+            ? 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-400 dark:border-yellow-700 border-2'
+            : 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800'
           : item.quantity_modified
           ? 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800'
           : 'bg-card'
@@ -69,12 +73,18 @@ export const DeliveryNoteItemCard = ({
         <div className="flex-1 space-y-2">
           <div className="flex items-start justify-between gap-2">
             <div className="space-y-1">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Package className="h-4 w-4 text-muted-foreground" />
                 <span className="font-mono text-lg font-bold">
                   {item.article_number}
                 </span>
-                {item.quantity_modified && (
+                {quantityDiffers && (
+                  <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-400 dark:bg-yellow-900 dark:text-yellow-100">
+                    <AlertTriangle className="h-3 w-3 mr-1" />
+                    Alla produkter ännu inte i lager
+                  </Badge>
+                )}
+                {item.quantity_modified && !item.is_checked && (
                   <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900 dark:text-yellow-100">
                     <AlertTriangle className="h-3 w-3 mr-1" />
                     Ändrad kvantitet

@@ -55,6 +55,21 @@ const Integrations = () => {
     enabled: !!user,
   });
 
+  const { data: syncDiscrepancies } = useQuery({
+    queryKey: ['sellus-sync-discrepancies'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('sellus_sync_discrepancies')
+        .select('*')
+        .eq('resolved', false)
+        .order('severity', { ascending: false })
+        .order('created_at', { ascending: false });
+      return data || [];
+    },
+    refetchInterval: 30000,
+    enabled: !!user,
+  });
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user || null);
@@ -280,7 +295,7 @@ const Integrations = () => {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader 
             className="cursor-pointer"
@@ -372,6 +387,33 @@ const Integrations = () => {
               {syncStatuses.find(s => s.sync_type === 'sale_import')?.total_synced || 0}
             </p>
             <p className="text-sm text-muted-foreground">synkade ordrar</p>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className="cursor-pointer hover:shadow-lg transition-shadow"
+          onClick={() => navigate('/delivery-notes')}
+        >
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-blue-500/10">
+                  <ClipboardList className="h-6 w-6 text-blue-500" />
+                </div>
+                <CardTitle className="text-xl">Följesedlar</CardTitle>
+              </div>
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground text-sm mb-2">
+              Hantera inleveranser och följesedlar
+            </p>
+            <p className="text-2xl font-bold text-blue-500">
+              {/* Will be replaced with actual count */}
+              <span className="opacity-50">-</span>
+            </p>
+            <p className="text-sm text-muted-foreground">följesedlar</p>
           </CardContent>
         </Card>
       </div>
