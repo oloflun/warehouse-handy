@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Package, Scan, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, AlertCircle } from "lucide-react";
+import { ProfileButton } from "@/components/ProfileButton";
 
 interface InventoryItem {
   id: string;
@@ -149,6 +150,7 @@ const Index = () => {
           </h1>
           <p className="text-muted-foreground mt-1">Välkommen, {user?.email}</p>
         </div>
+        <ProfileButton />
       </div>
 
       {syncFailures && syncFailures.length > 0 && (
