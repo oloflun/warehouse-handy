@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
 
     if (usersError) throw usersError;
 
-    // Combine role data with user email, display name, branch, and activation status
+    // Combine role data with user email, display name, branch
     const usersWithRoles = roles?.map((roleEntry: any) => {
       const authUser = authUsers?.find(u => u.id === roleEntry.user_id);
       const profile = roleEntry.profiles;
