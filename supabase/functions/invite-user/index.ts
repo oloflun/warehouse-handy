@@ -54,7 +54,15 @@ Deno.serve(async (req) => {
     }
 
     // Determine the proper redirect URL for email activation
-    const origin = req.headers.get('origin') || Deno.env.get('SUPABASE_URL');
+    // Priority: 1) Request origin, 2) SITE_URL env var, 3) SUPABASE_URL as fallback
+    const origin = req.headers.get('origin') || 
+                   Deno.env.get('SITE_URL') || 
+                   Deno.env.get('SUPABASE_URL');
+    
+    if (!origin) {
+      throw new Error('Unable to determine redirect URL. Please configure SITE_URL environment variable.');
+    }
+    
     const redirectTo = `${origin}/auth/callback`;
     
     console.log('Inviting user:', { email, role, redirectTo });
@@ -131,8 +139,17 @@ Deno.serve(async (req) => {
 
   } catch (error: any) {
     console.error('Error in invite-user function:', error);
+    
+    // Provide helpful error messages based on error type
+    let errorMessage = error.message;
+    if (error.message.includes('email')) {
+      errorMessage += ' Kontrollera att e-postadressen är korrekt och att e-postkonfigurationen i Supabase är inställd.';
+    } else if (error.message.includes('redirect')) {
+      errorMessage += ' Kontakta supporten om problemet kvarstår.';
+    }
+    
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
