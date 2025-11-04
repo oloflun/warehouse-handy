@@ -1,7 +1,7 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Shield, User, MoreHorizontal, Trash2, Edit, KeyRound, Lock, LockOpen } from "lucide-react";
+import { Shield, User, MoreHorizontal, Trash2, Edit, KeyRound, Lock, LockOpen, Clock } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -82,11 +82,13 @@ export const UserManagementTable = ({
                   )}
                   {user.is_pending && (
                     <Badge variant="outline" className="gap-1 bg-yellow-50 text-yellow-700 border-yellow-300">
+                      <Clock className="h-3 w-3" />
                       Väntande
                     </Badge>
                   )}
                   {user.is_limited && (
                     <Badge variant="outline" className="gap-1 bg-gray-50 text-gray-700 border-gray-300">
+                      <Lock className="h-3 w-3" />
                       Begränsad
                     </Badge>
                   )}

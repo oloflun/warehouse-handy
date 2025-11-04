@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
 
     if (inviteError) {
       console.error('Error inviting user:', inviteError);
-      throw new Error(`Failed to invite user: ${inviteError.message}`);
+      throw new Error('Failed to invite user. Please check the email address and try again.');
     }
 
     console.log('User invitation successful:', inviteData?.user?.id);

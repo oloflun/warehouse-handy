@@ -51,16 +51,21 @@ export const ProfileInfoCard = ({
 
     setIsChangingPassword(true);
     try {
-      // First verify current password by signing in
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password: currentPassword,
-      });
+      // Reauthenticate to verify current password
+      const { error: reauthError } = await supabase.auth.reauthenticate();
+      
+      if (reauthError) {
+        // If reauthenticate is not available, use signInWithPassword as fallback
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password: currentPassword,
+        });
 
-      if (signInError) {
-        toast.error("Felaktigt nuvarande lösenord");
-        setIsChangingPassword(false);
-        return;
+        if (signInError) {
+          toast.error("Felaktigt nuvarande lösenord");
+          setIsChangingPassword(false);
+          return;
+        }
       }
 
       // Update password
@@ -69,7 +74,7 @@ export const ProfileInfoCard = ({
       });
 
       if (updateError) {
-        toast.error("Misslyckades att ändra lösenord: " + updateError.message);
+        toast.error("Misslyckades att ändra lösenord");
       } else {
         toast.success("Lösenordet har ändrats");
         setShowChangePassword(false);
@@ -77,8 +82,7 @@ export const ProfileInfoCard = ({
         setNewPassword("");
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Okänt fel";
-      toast.error("Ett fel uppstod: " + errorMessage);
+      toast.error("Ett fel uppstod vid lösenordsändring");
     } finally {
       setIsChangingPassword(false);
     }

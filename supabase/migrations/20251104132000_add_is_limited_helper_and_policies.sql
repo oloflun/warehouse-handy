@@ -53,30 +53,40 @@ TO authenticated
 USING (true)
 WITH CHECK (NOT public.is_user_limited(auth.uid()));
 
--- For products (if they exist and have UPDATE policies)
-DROP POLICY IF EXISTS "Authenticated users can update products" ON public.products;
-CREATE POLICY "Authenticated users can update products"
-ON public.products
-FOR UPDATE
-TO authenticated
-USING (true)
-WITH CHECK (NOT public.is_user_limited(auth.uid()));
+-- For products table (conditionally update if it exists)
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'products') THEN
+    DROP POLICY IF EXISTS "Authenticated users can update products" ON public.products;
+    CREATE POLICY "Authenticated users can update products"
+    ON public.products
+    FOR UPDATE
+    TO authenticated
+    USING (true)
+    WITH CHECK (NOT public.is_user_limited(auth.uid()));
+  END IF;
+END $$;
 
--- For orders (if they exist and have INSERT/UPDATE policies)
-DROP POLICY IF EXISTS "Authenticated users can create orders" ON public.orders;
-CREATE POLICY "Authenticated users can create orders"
-ON public.orders
-FOR INSERT
-TO authenticated
-WITH CHECK (NOT public.is_user_limited(auth.uid()));
-
-DROP POLICY IF EXISTS "Authenticated users can update orders" ON public.orders;
-CREATE POLICY "Authenticated users can update orders"
-ON public.orders
-FOR UPDATE
-TO authenticated
-USING (true)
-WITH CHECK (NOT public.is_user_limited(auth.uid()));
+-- For orders table (conditionally update if it exists)
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'orders') THEN
+    DROP POLICY IF EXISTS "Authenticated users can create orders" ON public.orders;
+    CREATE POLICY "Authenticated users can create orders"
+    ON public.orders
+    FOR INSERT
+    TO authenticated
+    WITH CHECK (NOT public.is_user_limited(auth.uid()));
+    
+    DROP POLICY IF EXISTS "Authenticated users can update orders" ON public.orders;
+    CREATE POLICY "Authenticated users can update orders"
+    ON public.orders
+    FOR UPDATE
+    TO authenticated
+    USING (true)
+    WITH CHECK (NOT public.is_user_limited(auth.uid()));
+  END IF;
+END $$;
 
 -- Note: DELETE policies are typically more restrictive and often limited to admins
 -- Limited users should already be blocked from deleting by existing policies
