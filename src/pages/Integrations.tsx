@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { RefreshCw, CheckCircle2, XCircle, Clock, Package, List, ShoppingCart, ChevronRight, AlertCircle, Check, QrCode, ClipboardList } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { ProfileButton } from "@/components/ProfileButton";
 interface SyncStatus {
   id: string;
   sync_type: string;
@@ -39,6 +40,22 @@ const Integrations = () => {
   const [syncing, setSyncing] = useState<Record<string, boolean>>({});
   const [user, setUser] = useState<any>(null);
   const isMobile = useIsMobile();
+
+  // Check if user is super admin
+  const { data: isSuperAdmin } = useQuery({
+    queryKey: ["is-super-admin"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return false;
+      
+      const { data } = await supabase.rpc('is_super_admin', { 
+        _user_id: user.id 
+      });
+      return data;
+    },
+    enabled: !!user,
+  });
+
   const { data: syncFailures, refetch: refetchFailures } = useQuery({
     queryKey: ['sellus-sync-failures'],
     queryFn: async () => {
@@ -252,12 +269,11 @@ const Integrations = () => {
                 <ClipboardList className="h-4 w-4 mr-2" />
                 Följesedlar
               </Button>
-              <Button onClick={resolveAllItemIds} disabled={syncing['resolve-ids']} variant="secondary">
-                {syncing['resolve-ids'] ? 'Verifierar...' : 'Verifiera artikelkopplingar'}
-              </Button>
-              <Button onClick={() => navigate('/fdt-explorer')} variant="outline">
-                API Explorer
-              </Button>
+              {isSuperAdmin && (
+                <Button onClick={() => navigate('/fdt-explorer')} variant="outline">
+                  API Explorer
+                </Button>
+              )}
             </>}
           <Button onClick={fetchData} variant="outline" size="icon">
             <RefreshCw className="h-4 w-4" />
@@ -327,12 +343,13 @@ const Integrations = () => {
             </Card>
           </div>
 
-          {/* Höger kolumn: Synkroniseringslogg */}
-          <Card className="h-fit">
-            <CardHeader>
-              <CardTitle>Synkroniseringslogg</CardTitle>
-              <CardDescription>Senaste 50 synkroniseringarna</CardDescription>
-            </CardHeader>
+          {/* Höger kolumn: Synkroniseringslogg (endast Super-Admin) */}
+          {isSuperAdmin && (
+            <Card className="h-fit">
+              <CardHeader>
+                <CardTitle>Synkroniseringslogg</CardTitle>
+                <CardDescription>Senaste 50 synkroniseringarna</CardDescription>
+              </CardHeader>
             <CardContent>
               <div className="max-h-[calc(100vh-300px)] overflow-y-auto">
                 <Table>
@@ -378,6 +395,7 @@ const Integrations = () => {
               </div>
             </CardContent>
           </Card>
+          )}
         </div>
       ) : (
         /* Mobil: Original 4-korts grid */

@@ -1,34 +1,77 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ArrowLeft, Shield, User, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { ProfileInfoCard } from "@/components/ProfileInfoCard";
+import { UserManagementTable } from "@/components/UserManagementTable";
+import { AddUserDialog } from "@/components/AddUserDialog";
+import { EditUserDialog } from "@/components/EditUserDialog";
+import { DeleteUserDialog } from "@/components/DeleteUserDialog";
+import { ResetPasswordDialog } from "@/components/ResetPasswordDialog";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+
+interface User {
+  id: string;
+  email: string;
+  display_name: string;
+  role: string;
+  is_super_admin: boolean;
+  branch_name: string | null;
+  created_at: string;
+}
+
+const USERS_PER_PAGE = 10;
 
 const UserManagement = () => {
   const navigate = useNavigate();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [editUser, setEditUser] = useState<User | null>(null);
+  const [deleteUser, setDeleteUser] = useState<User | null>(null);
+  const [resetPasswordUser, setResetPasswordUser] = useState<User | null>(null);
 
-  // Check if user is admin
-  const { data: currentUser } = useQuery({
-    queryKey: ["current-user"],
+  // Fetch current user with profile
+  const { data: currentUserProfile } = useQuery({
+    queryKey: ["current-user-profile"],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
       
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select(`
+          *,
+          branches(name)
+        `)
+        .eq("id", user.id)
+        .single();
+      
       const { data: roleData } = await supabase
         .from("user_roles")
-        .select("role")
+        .select("role, is_super_admin")
         .eq("user_id", user.id)
         .single();
       
-      return { ...user, role: roleData?.role };
+      return { 
+        ...profile, 
+        email: user.email,
+        role: roleData?.role || "user",
+        is_super_admin: roleData?.is_super_admin || false,
+      };
     },
   });
 
-  // Fetch all users and their roles
+  // Fetch all users (only if admin)
   const { data: users, isLoading } = useQuery({
     queryKey: ["users-with-roles"],
     queryFn: async () => {
@@ -36,12 +79,11 @@ const UserManagement = () => {
       if (error) throw error;
       return data.users || [];
     },
-    enabled: currentUser?.role === "admin",
+    enabled: currentUserProfile?.role === "admin",
   });
 
-
   // Check admin permission
-  if (!currentUser || currentUser.role !== "admin") {
+  if (!currentUserProfile || currentUserProfile.role !== "admin") {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <Card className="max-w-md">
@@ -61,6 +103,13 @@ const UserManagement = () => {
     );
   }
 
+  // Pagination logic
+  const totalPages = Math.ceil((users?.length || 0) / USERS_PER_PAGE);
+  const paginatedUsers = users?.slice(
+    (currentPage - 1) * USERS_PER_PAGE,
+    currentPage * USERS_PER_PAGE
+  );
+
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -75,71 +124,107 @@ const UserManagement = () => {
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-3xl font-bold">Användarhantering</h1>
-              <p className="text-muted-foreground">Hantera användare</p>
+              <h1 className="text-3xl font-bold">Profil & Användarinställningar</h1>
+              <p className="text-muted-foreground">Hantera din profil och användare</p>
             </div>
           </div>
         </div>
 
-        {/* User list */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Användare</CardTitle>
-            <CardDescription>
-              Alla användare i systemet
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex items-center justify-center p-8">
-                <Loader2 className="h-8 w-8 animate-spin" />
+        {/* User Profile Card */}
+        <ProfileInfoCard
+          firstName={currentUserProfile.first_name}
+          lastName={currentUserProfile.last_name}
+          email={currentUserProfile.email || ""}
+          branchName={currentUserProfile.branches?.name}
+          role={currentUserProfile.role}
+          isSuperAdmin={currentUserProfile.is_super_admin}
+        />
+
+        {/* User Management Section (Admin only) */}
+        {currentUserProfile.role === "admin" && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Användarhantering</CardTitle>
+                  <CardDescription>
+                    Hantera alla användare i systemet
+                  </CardDescription>
+                </div>
+                <AddUserDialog />
               </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Namn</TableHead>
-                    <TableHead>E-post</TableHead>
-                    <TableHead>Roll</TableHead>
-                    <TableHead>Skapad</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users?.map((user: any) => (
-                    <TableRow key={user.id}>
-                      <TableCell className="font-medium">
-                        {user.display_name}
-                        {user.role === "admin" && (
-                          <Badge variant="outline" className="ml-2">Admin</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {user.email}
-                      </TableCell>
-                      <TableCell>
-                        {user.role === "admin" ? (
-                          <Badge variant="default" className="gap-1">
-                            <Shield className="h-3 w-3" />
-                            Admin
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="gap-1">
-                            <User className="h-3 w-4" />
-                            Användare
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {new Date(user.created_at).toLocaleDateString("sv-SE")}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="flex items-center justify-center p-8">
+                  <Loader2 className="h-8 w-8 animate-spin" />
+                </div>
+              ) : (
+                <>
+                  <UserManagementTable
+                    users={paginatedUsers || []}
+                    currentUserId={currentUserProfile.id}
+                    isSuperAdmin={currentUserProfile.is_super_admin}
+                    onEdit={setEditUser}
+                    onDelete={setDeleteUser}
+                    onResetPassword={setResetPasswordUser}
+                  />
+
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div className="mt-4">
+                      <Pagination>
+                        <PaginationContent>
+                          <PaginationItem>
+                            <PaginationPrevious 
+                              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                              className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
+                          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                            <PaginationItem key={page}>
+                              <PaginationLink
+                                onClick={() => setCurrentPage(page)}
+                                isActive={currentPage === page}
+                                className="cursor-pointer"
+                              >
+                                {page}
+                              </PaginationLink>
+                            </PaginationItem>
+                          ))}
+                          <PaginationItem>
+                            <PaginationNext 
+                              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                              className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    </div>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
+
+      {/* Dialogs */}
+      <EditUserDialog 
+        user={editUser} 
+        open={!!editUser} 
+        onOpenChange={(open) => !open && setEditUser(null)} 
+      />
+      <DeleteUserDialog 
+        user={deleteUser} 
+        open={!!deleteUser} 
+        onOpenChange={(open) => !open && setDeleteUser(null)} 
+      />
+      <ResetPasswordDialog 
+        user={resetPasswordUser} 
+        open={!!resetPasswordUser} 
+        onOpenChange={(open) => !open && setResetPasswordUser(null)} 
+      />
     </div>
   );
 };

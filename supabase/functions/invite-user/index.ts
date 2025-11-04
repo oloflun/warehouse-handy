@@ -47,7 +47,7 @@ Deno.serve(async (req) => {
       throw new Error('Only admins can invite users');
     }
 
-    const { email, role, firstName, lastName } = await req.json();
+    const { email, role, firstName, lastName, branchId } = await req.json();
 
     if (!email || !firstName || !lastName) {
       throw new Error('Email, first name, and last name are required');
@@ -83,13 +83,14 @@ Deno.serve(async (req) => {
         console.error('Error adding role:', roleInsertError);
       }
 
-      // Create profile with first and last name
+      // Create profile with first and last name and branch
       const { error: profileError } = await supabaseAdmin
         .from('profiles')
         .insert({
           id: inviteData.user.id,
           first_name: firstName,
-          last_name: lastName
+          last_name: lastName,
+          branch_id: branchId || null
         });
 
       if (profileError) {

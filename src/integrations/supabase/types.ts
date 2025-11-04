@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      branches: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       delivery_note_items: {
         Row: {
           article_number: string
@@ -468,6 +486,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          branch_id: string | null
           created_at: string | null
           first_name: string
           id: string
@@ -475,6 +494,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          branch_id?: string | null
           created_at?: string | null
           first_name: string
           id: string
@@ -482,13 +502,22 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          branch_id?: string | null
           created_at?: string | null
           first_name?: string
           id?: string
           last_name?: string
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sellus_sync_failures: {
         Row: {
@@ -590,6 +619,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           id: string
+          is_super_admin: boolean | null
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
@@ -597,6 +627,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           id?: string
+          is_super_admin?: boolean | null
           role?: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
@@ -604,6 +635,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           id?: string
+          is_super_admin?: boolean | null
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
@@ -643,6 +675,7 @@ export type Database = {
         }
         Returns: Json
       }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "user"

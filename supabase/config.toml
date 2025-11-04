@@ -9,8 +9,14 @@ verify_jwt = true
 [functions.auto-resolve-item-id]
 verify_jwt = false
 
+[functions.delete-user]
+verify_jwt = true
+
 [functions.fdt-api-explorer]
 verify_jwt = false
+
+[functions.reset-user-password]
+verify_jwt = true
 
 [functions.resolve-sellus-item-ids]
 verify_jwt = false
@@ -29,3 +35,6 @@ verify_jwt = false
 
 [functions.update-sellus-stock]
 verify_jwt = false
+
+[functions.update-user-profile]
+verify_jwt = true
