@@ -8,6 +8,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface User {
   id: string;
@@ -18,6 +24,7 @@ interface User {
   is_limited?: boolean;
   branch_name: string | null;
   created_at: string;
+  email_confirmed_at: string | null;
   is_pending?: boolean;
 }
 
@@ -58,6 +65,7 @@ export const UserManagementTable = ({
             <TableHead>Namn</TableHead>
             <TableHead>E-post</TableHead>
             <TableHead>Roll</TableHead>
+            <TableHead>Status</TableHead>
             <TableHead>Butik</TableHead>
             <TableHead>Skapad</TableHead>
             <TableHead className="w-[50px]"></TableHead>
@@ -103,6 +111,30 @@ export const UserManagementTable = ({
                 ) : (
                   <span className="text-sm">Användare</span>
                 )}
+              </TableCell>
+              <TableCell>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      {user.is_pending ? (
+                        <Badge variant="outline" className="gap-1 text-yellow-600 border-yellow-600 cursor-help">
+                          Väntande
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="gap-1 text-green-600 border-green-600 cursor-help">
+                          Aktiv
+                        </Badge>
+                      )}
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>
+                        {user.is_pending 
+                          ? "Användaren har blivit inbjuden men har inte aktiverat sitt konto ännu"
+                          : "Användaren har aktiverat sitt konto och kan logga in"}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </TableCell>
               <TableCell className="text-sm">
                 {user.branch_name || "-"}

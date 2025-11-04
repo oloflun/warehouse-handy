@@ -59,11 +59,10 @@ export const AddUserDialog = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: (data) => {
-      const message = data?.note 
-        ? `Användare inbjuden! ${data.note}`
-        : "Användare inbjuden! Användaren kommer att få ett aktiveringsmail.";
-      toast.success(message, { duration: 5000 });
+copilot/overhaul-user-management-ui
+    onSuccess: () => {
+      toast.success("Användare inbjuden! Ett aktiverings-e-postmeddelande har skickats.");
+ main
       queryClient.invalidateQueries({ queryKey: ["users-with-roles"] });
       setOpen(false);
       // Reset form

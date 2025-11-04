@@ -53,6 +53,20 @@ Deno.serve(async (req) => {
       throw new Error('Email, first name, and last name are required');
     }
 
+    // Determine the proper redirect URL for email activation
+    // Priority: 1) Request origin, 2) SITE_URL env var, 3) SUPABASE_URL as fallback
+    const origin = req.headers.get('origin') || 
+                   Deno.env.get('SITE_URL') || 
+                   Deno.env.get('SUPABASE_URL');
+    
+    if (!origin) {
+      throw new Error('Unable to determine redirect URL. Please configure SITE_URL environment variable.');
+    }
+    
+    const redirectTo = `${origin}/auth/callback`;
+    
+    console.log('Inviting user:', { email, role, redirectTo });
+    
     // Invite user via Supabase Admin API
     console.log('Attempting to invite user:', email);
     const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
@@ -60,9 +74,11 @@ Deno.serve(async (req) => {
       {
         data: {
           invited_by: user.id,
-          invited_at: new Date().toISOString()
+          invited_at: new Date().toISOString(),
+          first_name: firstName,
+          last_name: lastName,
         },
-        redirectTo: `${req.headers.get('origin') || Deno.env.get('SUPABASE_URL')}/auth`
+        redirectTo: redirectTo
       }
     );
 
@@ -70,11 +86,15 @@ Deno.serve(async (req) => {
       console.error('Error inviting user:', inviteError);
       throw new Error('Failed to invite user. Please check the email address and try again.');
     }
+    
+    console.log('User invited successfully:', { userId: inviteData?.user?.id, email });
 
     console.log('User invitation successful:', inviteData?.user?.id);
 
     // Add role for the new user
     if (inviteData?.user?.id) {
+      console.log('Creating user role and profile for:', inviteData.user.id);
+      
       const { error: roleInsertError } = await supabaseAdmin
         .from('user_roles')
         .insert({
@@ -85,6 +105,7 @@ Deno.serve(async (req) => {
 
       if (roleInsertError) {
         console.error('Error adding role:', roleInsertError);
+        throw new Error(`Failed to add role: ${roleInsertError.message}`);
       }
 
       // Create profile with first and last name and branch
@@ -99,7 +120,12 @@ Deno.serve(async (req) => {
 
       if (profileError) {
         console.error('Error creating profile:', profileError);
+        throw new Error(`Failed to create profile: ${profileError.message}`);
       }
+      
+      console.log('User role and profile created successfully');
+    } else {
+      throw new Error('User invitation succeeded but no user ID was returned');
     }
 
     return new Response(
@@ -117,8 +143,17 @@ Deno.serve(async (req) => {
 
   } catch (error: any) {
     console.error('Error in invite-user function:', error);
+    
+    // Provide helpful error messages based on error type
+    let errorMessage = error.message;
+    if (error.message.includes('email')) {
+      errorMessage += ' Kontrollera att e-postadressen är korrekt och att e-postkonfigurationen i Supabase är inställd.';
+    } else if (error.message.includes('redirect')) {
+      errorMessage += ' Kontakta supporten om problemet kvarstår.';
+    }
+    
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
