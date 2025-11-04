@@ -59,8 +59,11 @@ export const AddUserDialog = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      toast.success("Användare inbjuden!");
+    onSuccess: (data) => {
+      const message = data?.note 
+        ? `Användare inbjuden! ${data.note}`
+        : "Användare inbjuden! Användaren kommer att få ett aktiveringsmail.";
+      toast.success(message, { duration: 5000 });
       queryClient.invalidateQueries({ queryKey: ["users-with-roles"] });
       setOpen(false);
       // Reset form

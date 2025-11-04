@@ -54,6 +54,7 @@ Deno.serve(async (req) => {
     }
 
     // Invite user via Supabase Admin API
+    console.log('Attempting to invite user:', email);
     const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
       email,
       {
@@ -66,8 +67,11 @@ Deno.serve(async (req) => {
     );
 
     if (inviteError) {
-      throw inviteError;
+      console.error('Error inviting user:', inviteError);
+      throw new Error('Failed to invite user. Please check the email address and try again.');
     }
+
+    console.log('User invitation successful:', inviteData?.user?.id);
 
     // Add role for the new user
     if (inviteData?.user?.id) {
@@ -101,8 +105,9 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Invitation sent successfully',
-        user: inviteData.user 
+        message: 'Invitation sent successfully. The user will receive an activation email.',
+        user: inviteData.user,
+        note: 'If the email is not received, check Supabase SMTP settings in Authentication > Email Templates'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
