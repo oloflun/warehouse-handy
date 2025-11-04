@@ -60,7 +60,7 @@ export const AddUserDialog = () => {
       return data;
     },
     onSuccess: () => {
-      toast.success("Användare inbjuden!");
+      toast.success("Användare inbjuden! Ett aktiverings-e-postmeddelande har skickats.");
       queryClient.invalidateQueries({ queryKey: ["users-with-roles"] });
       setOpen(false);
       // Reset form
