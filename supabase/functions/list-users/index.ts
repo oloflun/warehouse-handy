@@ -54,7 +54,6 @@ Deno.serve(async (req) => {
         user_id, 
         role,
         is_super_admin,
-        is_limited,
         created_at,
         profiles!inner(
           first_name, 
@@ -77,20 +76,14 @@ Deno.serve(async (req) => {
       const authUser = authUsers?.find(u => u.id === roleEntry.user_id);
       const profile = roleEntry.profiles;
       
-      // Check if user is pending (invited but not confirmed)
-      const isPending = authUser?.email_confirmed_at === null || 
-                        authUser?.last_sign_in_at === null;
-      
       return {
         id: roleEntry.user_id,
         email: authUser?.email || 'Unknown',
         display_name: profile ? `${profile.first_name} ${profile.last_name}` : 'Unknown',
         role: roleEntry.role,
         is_super_admin: roleEntry.is_super_admin || false,
-        is_limited: roleEntry.is_limited || false,
         branch_name: profile?.branches?.name || null,
         created_at: roleEntry.created_at,
-        is_pending: isPending,
       };
     }) || [];
 
