@@ -1,7 +1,7 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Shield, User, MoreHorizontal, Trash2, Edit, KeyRound } from "lucide-react";
+import { Shield, User, MoreHorizontal, Trash2, Edit, KeyRound, Lock, LockOpen, Clock } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,10 +21,11 @@ interface User {
   display_name: string;
   role: string;
   is_super_admin: boolean;
+  is_limited?: boolean;
   branch_name: string | null;
   created_at: string;
   email_confirmed_at: string | null;
-  is_pending: boolean;
+  is_pending?: boolean;
 }
 
 interface UserManagementTableProps {
@@ -34,6 +35,7 @@ interface UserManagementTableProps {
   onEdit: (user: User) => void;
   onDelete: (user: User) => void;
   onResetPassword: (user: User) => void;
+  onToggleLimited: (user: User) => void;
 }
 
 export const UserManagementTable = ({
@@ -43,6 +45,7 @@ export const UserManagementTable = ({
   onEdit,
   onDelete,
   onResetPassword,
+  onToggleLimited,
 }: UserManagementTableProps) => {
   const canModifyUser = (user: User) => {
     // Can't modify yourself
@@ -72,25 +75,41 @@ export const UserManagementTable = ({
           {users.map((user) => (
             <TableRow key={user.id}>
               <TableCell className="font-medium">
-                {user.display_name}
-                {user.is_super_admin && (
-                  <Badge variant="outline" className="ml-2">Super-Admin</Badge>
-                )}
+                <div className="flex items-center gap-2">
+                  <span>
+                    {user.display_name}
+                    {user.branch_name && (
+                      <span className="text-muted-foreground font-normal"> - {user.branch_name}</span>
+                    )}
+                  </span>
+                  {user.role === "admin" && (
+                    <Badge variant="default" className="gap-1">
+                      <Shield className="h-3 w-3" />
+                      Admin
+                    </Badge>
+                  )}
+                  {user.is_pending && (
+                    <Badge variant="outline" className="gap-1 bg-yellow-50 text-yellow-700 border-yellow-300">
+                      <Clock className="h-3 w-3" />
+                      Väntande
+                    </Badge>
+                  )}
+                  {user.is_limited && (
+                    <Badge variant="outline" className="gap-1 bg-gray-50 text-gray-700 border-gray-300">
+                      <Lock className="h-3 w-3" />
+                      Begränsad
+                    </Badge>
+                  )}
+                </div>
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 {user.email}
               </TableCell>
               <TableCell>
                 {user.role === "admin" ? (
-                  <Badge variant="default" className="gap-1">
-                    <Shield className="h-3 w-3" />
-                    Admin
-                  </Badge>
+                  <span className="text-sm">Admin</span>
                 ) : (
-                  <Badge variant="secondary" className="gap-1">
-                    <User className="h-3 w-4" />
-                    Användare
-                  </Badge>
+                  <span className="text-sm">Användare</span>
                 )}
               </TableCell>
               <TableCell>
@@ -139,7 +158,20 @@ export const UserManagementTable = ({
                       <>
                         <DropdownMenuItem onClick={() => onEdit(user)}>
                           <Edit className="mr-2 h-4 w-4" />
-                          Redigera
+                          Ändra roll
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onToggleLimited(user)}>
+                          {user.is_limited ? (
+                            <>
+                              <LockOpen className="mr-2 h-4 w-4" />
+                              Ge full åtkomst
+                            </>
+                          ) : (
+                            <>
+                              <Lock className="mr-2 h-4 w-4" />
+                              Begränsa användare
+                            </>
+                          )}
                         </DropdownMenuItem>
                         <DropdownMenuItem 
                           onClick={() => onDelete(user)}

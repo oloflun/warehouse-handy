@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,20 +27,45 @@ interface User {
   display_name: string;
   role: string;
   is_super_admin: boolean;
+  is_limited?: boolean;
   branch_name: string | null;
   created_at: string;
-  email_confirmed_at: string | null;
-  is_pending: boolean;
+  is_pending?: boolean;
 }
 
 const USERS_PER_PAGE = 10;
 
 const UserManagement = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [currentPage, setCurrentPage] = useState(1);
   const [editUser, setEditUser] = useState<User | null>(null);
   const [deleteUser, setDeleteUser] = useState<User | null>(null);
   const [resetPasswordUser, setResetPasswordUser] = useState<User | null>(null);
+
+  const handleToggleLimited = async (user: User) => {
+    try {
+      const { error } = await supabase.functions.invoke("toggle-user-limited", {
+        body: {
+          userId: user.id,
+          isLimited: !user.is_limited,
+        },
+      });
+      
+      if (error) throw error;
+      
+      toast.success(
+        user.is_limited 
+          ? `${user.display_name} har nu full åtkomst`
+          : `${user.display_name} är nu begränsad (endast läsning)`
+      );
+      
+      queryClient.invalidateQueries({ queryKey: ["users-with-roles"] });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Okänt fel";
+      toast.error("Misslyckades att ändra användarstatus: " + errorMessage);
+    }
+  };
 
   // Fetch current user with profile
   const { data: currentUserProfile } = useQuery({
@@ -79,7 +104,8 @@ const UserManagement = () => {
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke("list-users");
       if (error) throw error;
-      return data.users || [];
+      // Filter out super-admin users from the list
+      return (data.users || []).filter((user: User) => !user.is_super_admin);
     },
     enabled: currentUserProfile?.role === "admin",
   });
@@ -170,6 +196,7 @@ const UserManagement = () => {
                     onEdit={setEditUser}
                     onDelete={setDeleteUser}
                     onResetPassword={setResetPasswordUser}
+                    onToggleLimited={handleToggleLimited}
                   />
 
                   {/* Pagination */}

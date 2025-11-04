@@ -619,6 +619,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           id: string
+          is_limited: boolean | null
           is_super_admin: boolean | null
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
@@ -627,6 +628,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           id?: string
+          is_limited?: boolean | null
           is_super_admin?: boolean | null
           role?: Database["public"]["Enums"]["app_role"]
           user_id: string
@@ -635,6 +637,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           id?: string
+          is_limited?: boolean | null
           is_super_admin?: boolean | null
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
