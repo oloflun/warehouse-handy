@@ -76,8 +76,9 @@ export const ProfileInfoCard = ({
         setCurrentPassword("");
         setNewPassword("");
       }
-    } catch (error: any) {
-      toast.error("Ett fel uppstod: " + error.message);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Okänt fel";
+      toast.error("Ett fel uppstod: " + errorMessage);
     } finally {
       setIsChangingPassword(false);
     }

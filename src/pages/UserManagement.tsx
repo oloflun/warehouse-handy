@@ -61,8 +61,9 @@ const UserManagement = () => {
       );
       
       queryClient.invalidateQueries({ queryKey: ["users-with-roles"] });
-    } catch (error: any) {
-      toast.error("Misslyckades att ändra användarstatus: " + error.message);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Okänt fel";
+      toast.error("Misslyckades att ändra användarstatus: " + errorMessage);
     }
   };
 
@@ -104,7 +105,7 @@ const UserManagement = () => {
       const { data, error } = await supabase.functions.invoke("list-users");
       if (error) throw error;
       // Filter out super-admin users from the list
-      return (data.users || []).filter((user: any) => !user.is_super_admin);
+      return (data.users || []).filter((user: User) => !user.is_super_admin);
     },
     enabled: currentUserProfile?.role === "admin",
   });
