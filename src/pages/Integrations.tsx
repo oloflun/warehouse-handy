@@ -255,29 +255,15 @@ const Integrations = () => {
           
         </div>
         <div className="flex flex-wrap gap-2 items-center justify-end">
-          {isMobile ? <>
-              <Button onClick={() => navigate('/scanner')} variant="default" className="flex items-center gap-2">
-                <QrCode className="h-4 w-4" />
-                Scanner
-              </Button>
-              <Button onClick={() => navigate('/delivery-notes')} variant="secondary" className="flex items-center gap-2">
-                <ClipboardList className="h-4 w-4" />
-                Följesedlar
-              </Button>
-            </> : <>
-              <Button onClick={() => navigate('/delivery-notes')} variant="default">
-                <ClipboardList className="h-4 w-4 mr-2" />
-                Följesedlar
-              </Button>
-              {isSuperAdmin && (
-                <Button onClick={() => navigate('/fdt-explorer')} variant="outline">
-                  API Explorer
-                </Button>
-              )}
-            </>}
+          {!isMobile && isSuperAdmin && (
+            <Button onClick={() => navigate('/fdt-explorer')} variant="outline">
+              API Explorer
+            </Button>
+          )}
           <Button onClick={fetchData} variant="outline" size="icon">
             <RefreshCw className="h-4 w-4" />
           </Button>
+          <ProfileButton />
         </div>
       </div>
 
@@ -286,6 +272,20 @@ const Integrations = () => {
         <div className="grid grid-cols-[320px_1fr] gap-6">
           {/* Vänster kolumn: Navigationskort */}
           <div className="space-y-4">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/scanner')}>
+              <CardHeader className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-blue-500/10">
+                    <QrCode className="h-5 w-5 text-blue-500" />
+                  </div>
+                  <div className="flex-1">
+                    <CardTitle className="text-lg">Scanna</CardTitle>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </div>
+              </CardHeader>
+            </Card>
+
             <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/inventory')}>
               <CardHeader className="p-4">
                 <div className="flex items-center gap-3">
@@ -400,6 +400,20 @@ const Integrations = () => {
       ) : (
         /* Mobil: Original 4-korts grid */
         <div className="grid gap-6 grid-cols-1">
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/scanner')}>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-blue-500/10">
+                    <QrCode className="h-6 w-6 text-blue-500" />
+                  </div>
+                  <CardTitle className="text-xl">Scanna</CardTitle>
+                </div>
+                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+              </div>
+            </CardHeader>
+          </Card>
+
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader onClick={() => navigate('/inventory')} className="cursor-pointer rounded-none">
               <div className="flex items-center justify-between">
