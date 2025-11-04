@@ -1,7 +1,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Shield, User } from "lucide-react";
+import { Shield, User, LogOut } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ProfileInfoCardProps {
   firstName: string;
@@ -20,13 +22,32 @@ export const ProfileInfoCard = ({
   role,
   isSuperAdmin,
 }: ProfileInfoCardProps) => {
+  const navigate = useNavigate();
   const displayName = `${firstName} ${lastName}${role === 'admin' ? ' - Admin' : ''}`;
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/auth");
+  };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Min Profil</CardTitle>
-        <CardDescription>Din kontoinformation</CardDescription>
+        <div className="flex items-start justify-between">
+          <div>
+            <CardTitle>Min Profil</CardTitle>
+            <CardDescription>Din kontoinformation</CardDescription>
+          </div>
+          <Button 
+            variant="destructive" 
+            size="sm"
+            onClick={handleLogout}
+            className="flex items-center gap-2"
+          >
+            <LogOut className="h-4 w-4" />
+            Logga ut
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
