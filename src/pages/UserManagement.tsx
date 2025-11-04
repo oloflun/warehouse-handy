@@ -29,6 +29,8 @@ interface User {
   is_super_admin: boolean;
   branch_name: string | null;
   created_at: string;
+  email_confirmed_at: string | null;
+  is_pending: boolean;
 }
 
 const USERS_PER_PAGE = 10;

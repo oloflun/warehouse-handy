@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
 
     if (usersError) throw usersError;
 
-    // Combine role data with user email, display name, branch
+    // Combine role data with user email, display name, branch, and activation status
     const usersWithRoles = roles?.map((roleEntry: any) => {
       const authUser = authUsers?.find(u => u.id === roleEntry.user_id);
       const profile = roleEntry.profiles;
@@ -84,6 +84,8 @@ Deno.serve(async (req) => {
         is_super_admin: roleEntry.is_super_admin || false,
         branch_name: profile?.branches?.name || null,
         created_at: roleEntry.created_at,
+        email_confirmed_at: authUser?.email_confirmed_at || null,
+        is_pending: !authUser?.email_confirmed_at,
       };
     }) || [];
 

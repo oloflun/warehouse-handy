@@ -53,24 +53,37 @@ Deno.serve(async (req) => {
       throw new Error('Email, first name, and last name are required');
     }
 
+    // Determine the proper redirect URL for email activation
+    const origin = req.headers.get('origin') || Deno.env.get('SUPABASE_URL');
+    const redirectTo = `${origin}/auth/callback`;
+    
+    console.log('Inviting user:', { email, role, redirectTo });
+    
     // Invite user via Supabase Admin API
     const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
       email,
       {
         data: {
           invited_by: user.id,
-          invited_at: new Date().toISOString()
+          invited_at: new Date().toISOString(),
+          first_name: firstName,
+          last_name: lastName,
         },
-        redirectTo: `${req.headers.get('origin') || Deno.env.get('SUPABASE_URL')}/auth`
+        redirectTo: redirectTo
       }
     );
 
     if (inviteError) {
+      console.error('Error inviting user:', inviteError);
       throw inviteError;
     }
+    
+    console.log('User invited successfully:', { userId: inviteData?.user?.id, email });
 
     // Add role for the new user
     if (inviteData?.user?.id) {
+      console.log('Creating user role and profile for:', inviteData.user.id);
+      
       const { error: roleInsertError } = await supabaseAdmin
         .from('user_roles')
         .insert({
@@ -81,6 +94,7 @@ Deno.serve(async (req) => {
 
       if (roleInsertError) {
         console.error('Error adding role:', roleInsertError);
+        throw new Error(`Failed to add role: ${roleInsertError.message}`);
       }
 
       // Create profile with first and last name and branch
@@ -95,7 +109,12 @@ Deno.serve(async (req) => {
 
       if (profileError) {
         console.error('Error creating profile:', profileError);
+        throw new Error(`Failed to create profile: ${profileError.message}`);
       }
+      
+      console.log('User role and profile created successfully');
+    } else {
+      throw new Error('User invitation succeeded but no user ID was returned');
     }
 
     return new Response(

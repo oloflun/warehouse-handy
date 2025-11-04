@@ -17,6 +17,8 @@ interface User {
   is_super_admin: boolean;
   branch_name: string | null;
   created_at: string;
+  email_confirmed_at: string | null;
+  is_pending: boolean;
 }
 
 interface UserManagementTableProps {
@@ -54,6 +56,7 @@ export const UserManagementTable = ({
             <TableHead>Namn</TableHead>
             <TableHead>E-post</TableHead>
             <TableHead>Roll</TableHead>
+            <TableHead>Status</TableHead>
             <TableHead>Butik</TableHead>
             <TableHead>Skapad</TableHead>
             <TableHead className="w-[50px]"></TableHead>
@@ -81,6 +84,17 @@ export const UserManagementTable = ({
                   <Badge variant="secondary" className="gap-1">
                     <User className="h-3 w-4" />
                     Användare
+                  </Badge>
+                )}
+              </TableCell>
+              <TableCell>
+                {user.is_pending ? (
+                  <Badge variant="outline" className="gap-1 text-yellow-600 border-yellow-600">
+                    Väntande
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="gap-1 text-green-600 border-green-600">
+                    Aktiv
                   </Badge>
                 )}
               </TableCell>
