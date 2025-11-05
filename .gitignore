@@ -31,4 +31,5 @@ dist-ssr
 # Backup files
 backups/
 *.sql
+!DEPLOY_DATABASE.sql
 *.tar.gz
