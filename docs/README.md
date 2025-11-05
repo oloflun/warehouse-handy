@@ -186,15 +186,15 @@ npm run lint
 ### Essential Environment Variables
 
 ```env
-VITE_SUPABASE_PROJECT_ID=qadtpwdokdfqtpvwwhsn
+VITE_SUPABASE_PROJECT_ID=sublzjeyxfaxiekacfme
 VITE_SUPABASE_PUBLISHABLE_KEY=[from-supabase-dashboard]
-VITE_SUPABASE_URL=https://qadtpwdokdfqtpvwwhsn.supabase.co
+VITE_SUPABASE_URL=https://sublzjeyxfaxiekacfme.supabase.co
 ```
 
 ### Key Links
 
 - **Supabase Dashboard**: https://supabase.com/dashboard
-- **Project**: qadtpwdokdfqtpvwwhsn
+- **Project**: sublzjeyxfaxiekacfme
 - **GitHub**: https://github.com/oloflun/warehouse-handy
 
 ---
@@ -235,11 +235,11 @@ This documentation follows these principles:
 
 | Document | Status | Last Updated | Version |
 |----------|--------|--------------|---------|
-| MIGRATION_SUMMARY.md | ✅ Current | 2025-11-05 | 1.0 |
-| BACKUP_AND_RESTORE.md | ✅ Current | 2025-11-05 | 1.0 |
-| DATABASE_SCHEMA.md | ✅ Current | 2025-11-05 | 1.0 |
-| DEPLOYMENT_GUIDE.md | ✅ Current | 2025-11-05 | 1.0 |
-| MIGRATION_FROM_LOVABLE.md | ✅ Current | 2025-11-05 | 1.0 |
+| MIGRATION_SUMMARY.md | ✅ Current | 2024-11-05 | 1.0 |
+| BACKUP_AND_RESTORE.md | ✅ Current | 2024-11-05 | 1.0 |
+| DATABASE_SCHEMA.md | ✅ Current | 2024-11-05 | 1.0 |
+| DEPLOYMENT_GUIDE.md | ✅ Current | 2024-11-05 | 1.0 |
+| MIGRATION_FROM_LOVABLE.md | ✅ Current | 2024-11-05 | 1.0 |
 | USER_MANAGEMENT_CHANGES.md | ✅ Current | 2024-11-04 | 1.0 |
 | EMAIL_CONFIGURATION.md | ✅ Current | 2024-10-28 | 1.0 |
 
@@ -281,7 +281,7 @@ This documentation follows these principles:
 ---
 
 **Documentation maintained by**: Anton Lundin (oloflundin@icloud.com)  
-**Last major update**: November 5, 2025  
+**Last major update**: November 5, 2024  
 **Documentation version**: 1.0
 
 ---

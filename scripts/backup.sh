@@ -8,7 +8,7 @@
 # Environment variables required:
 #   SUPABASE_DB_URL - PostgreSQL connection string
 #   or individual components:
-#   SUPABASE_PROJECT_REF - Project reference (e.g., qadtpwdokdfqtpvwwhsn)
+#   SUPABASE_PROJECT_REF - Project reference (e.g., sublzjeyxfaxiekacfme)
 #   SUPABASE_DB_PASSWORD - Database password
 
 set -e  # Exit on error
@@ -108,7 +108,11 @@ backup_database() {
 backup_migrations() {
     log_info "Backing up migrations..."
     mkdir -p migrations
-    cp -r "$PROJECT_ROOT/supabase/migrations/"*.sql migrations/ 2>/dev/null || log_warn "No migrations found"
+    if [ -d "$PROJECT_ROOT/supabase/migrations" ] && [ "$(ls -A "$PROJECT_ROOT/supabase/migrations/"*.sql 2>/dev/null)" ]; then
+        cp "$PROJECT_ROOT/supabase/migrations/"*.sql migrations/
+    else
+        log_warn "No migrations found"
+    fi
     log_info "Migrations backed up."
 }
 

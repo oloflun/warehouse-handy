@@ -16,9 +16,9 @@ Get Warehouse Handy running in under 10 minutes!
 
 2. **Add Environment Variables** (after import)
    ```
-   VITE_SUPABASE_PROJECT_ID=qadtpwdokdfqtpvwwhsn
+   VITE_SUPABASE_PROJECT_ID=sublzjeyxfaxiekacfme
    VITE_SUPABASE_PUBLISHABLE_KEY=[get-from-supabase-dashboard]
-   VITE_SUPABASE_URL=https://qadtpwdokdfqtpvwwhsn.supabase.co
+   VITE_SUPABASE_URL=https://sublzjeyxfaxiekacfme.supabase.co
    ```
 
 3. **Update Supabase**
@@ -39,9 +39,9 @@ npm install
 
 # 3. Create .env file
 cat > .env << 'EOF'
-VITE_SUPABASE_PROJECT_ID=qadtpwdokdfqtpvwwhsn
+VITE_SUPABASE_PROJECT_ID=sublzjeyxfaxiekacfme
 VITE_SUPABASE_PUBLISHABLE_KEY=[your-key-here]
-VITE_SUPABASE_URL=https://qadtpwdokdfqtpvwwhsn.supabase.co
+VITE_SUPABASE_URL=https://sublzjeyxfaxiekacfme.supabase.co
 EOF
 
 # 4. Start development server
@@ -71,7 +71,7 @@ npm run dev
 ## Getting Supabase Keys
 
 1. Go to [Supabase Dashboard](https://supabase.com/dashboard)
-2. Select your project (or use existing project: `qadtpwdokdfqtpvwwhsn`)
+2. Select your project (or use existing project: `sublzjeyxfaxiekacfme`)
 3. Go to Settings → API
 4. Copy these values:
    - **Project URL** → `VITE_SUPABASE_URL`

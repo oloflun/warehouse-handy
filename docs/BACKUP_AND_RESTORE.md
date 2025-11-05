@@ -27,7 +27,7 @@ All critical components must be backed up regularly to ensure business continuit
 Supabase Pro plan includes automatic daily backups. To access:
 
 1. Navigate to [Supabase Dashboard](https://supabase.com/dashboard)
-2. Select your project: `qadtpwdokdfqtpvwwhsn`
+2. Select your project: `sublzjeyxfaxiekacfme`
 3. Go to Database → Backups
 4. Download the latest backup
 
@@ -43,7 +43,7 @@ npm install -g supabase
 supabase login
 
 # Link to your project
-supabase link --project-ref qadtpwdokdfqtpvwwhsn
+supabase link --project-ref sublzjeyxfaxiekacfme
 
 # Export database schema and data
 supabase db dump -f backup_$(date +%Y%m%d_%H%M%S).sql
@@ -62,11 +62,11 @@ supabase db dump --data-only -f data_$(date +%Y%m%d_%H%M%S).sql
 # Connection string format: postgresql://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres
 
 # Full database backup
-pg_dump "postgresql://postgres:[PASSWORD]@db.qadtpwdokdfqtpvwwhsn.supabase.co:5432/postgres" \
+pg_dump "postgresql://postgres:[PASSWORD]@db.sublzjeyxfaxiekacfme.supabase.co:5432/postgres" \
   > backup_$(date +%Y%m%d_%H%M%S).sql
 
 # Backup specific tables
-pg_dump "postgresql://postgres:[PASSWORD]@db.qadtpwdokdfqtpvwwhsn.supabase.co:5432/postgres" \
+pg_dump "postgresql://postgres:[PASSWORD]@db.sublzjeyxfaxiekacfme.supabase.co:5432/postgres" \
   -t products -t inventory -t orders -t delivery_notes \
   > critical_tables_$(date +%Y%m%d_%H%M%S).sql
 ```
@@ -159,9 +159,9 @@ Save your `.env` file securely:
 
 ```bash
 # Current configuration (.env file):
-VITE_SUPABASE_PROJECT_ID=qadtpwdokdfqtpvwwhsn
+VITE_SUPABASE_PROJECT_ID=sublzjeyxfaxiekacfme
 VITE_SUPABASE_PUBLISHABLE_KEY=[key]
-VITE_SUPABASE_URL=https://qadtpwdokdfqtpvwwhsn.supabase.co
+VITE_SUPABASE_URL=https://sublzjeyxfaxiekacfme.supabase.co
 ```
 
 **⚠️ IMPORTANT**: Store this file in a secure location (password manager, encrypted storage). Never commit it to Git.

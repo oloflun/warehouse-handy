@@ -32,7 +32,7 @@ To migrate away from Lovable, you need to:
 - Supabase CLI (optional, but recommended)
 
 ### Required Accounts
-- Supabase account (already have: project `qadtpwdokdfqtpvwwhsn`)
+- Supabase account (already have: project `sublzjeyxfaxiekacfme`)
 - Hosting platform account (choose one):
   - Vercel (recommended for React apps)
   - Netlify
@@ -67,8 +67,8 @@ Your Supabase backend is already set up and configured. This section verifies it
 ### 1. Verify Supabase Project
 
 Current project details:
-- **Project ID**: `qadtpwdokdfqtpvwwhsn`
-- **URL**: `https://qadtpwdokdfqtpvwwhsn.supabase.co`
+- **Project ID**: `sublzjeyxfaxiekacfme`
+- **URL**: `https://sublzjeyxfaxiekacfme.supabase.co`
 - **Region**: Check in Supabase Dashboard
 
 ### 2. Verify Database Migrations
@@ -92,7 +92,7 @@ All 18 Edge Functions should be deployed:
 
 ```bash
 # List deployed functions
-supabase functions list --project-ref qadtpwdokdfqtpvwwhsn
+supabase functions list --project-ref sublzjeyxfaxiekacfme
 
 # Expected functions:
 # - analyze-delivery-note
@@ -119,10 +119,10 @@ If any functions are missing, deploy them:
 
 ```bash
 # Deploy all functions
-supabase functions deploy --project-ref qadtpwdokdfqtpvwwhsn
+supabase functions deploy --project-ref sublzjeyxfaxiekacfme
 
 # Or deploy specific function
-supabase functions deploy [function-name] --project-ref qadtpwdokdfqtpvwwhsn
+supabase functions deploy [function-name] --project-ref sublzjeyxfaxiekacfme
 ```
 
 ### 4. Configure Function Secrets
@@ -131,10 +131,10 @@ If your Edge Functions use environment variables:
 
 ```bash
 # Example: Set OpenAI API key (if used)
-supabase secrets set OPENAI_API_KEY=your-key-here --project-ref qadtpwdokdfqtpvwwhsn
+supabase secrets set OPENAI_API_KEY=your-key-here --project-ref sublzjeyxfaxiekacfme
 
 # List all secrets
-supabase secrets list --project-ref qadtpwdokdfqtpvwwhsn
+supabase secrets list --project-ref sublzjeyxfaxiekacfme
 ```
 
 ### 5. Verify Authentication Settings
@@ -177,9 +177,9 @@ Vercel is optimized for React/Vite applications and offers:
 
 3. **Configure Environment Variables**
    ```
-   VITE_SUPABASE_PROJECT_ID=qadtpwdokdfqtpvwwhsn
+   VITE_SUPABASE_PROJECT_ID=sublzjeyxfaxiekacfme
    VITE_SUPABASE_PUBLISHABLE_KEY=[your-anon-key]
-   VITE_SUPABASE_URL=https://qadtpwdokdfqtpvwwhsn.supabase.co
+   VITE_SUPABASE_URL=https://sublzjeyxfaxiekacfme.supabase.co
    ```
 
 4. **Deploy**
@@ -229,9 +229,9 @@ Netlify is another excellent option for static sites.
 
 4. **Environment Variables**
    ```
-   VITE_SUPABASE_PROJECT_ID=qadtpwdokdfqtpvwwhsn
+   VITE_SUPABASE_PROJECT_ID=sublzjeyxfaxiekacfme
    VITE_SUPABASE_PUBLISHABLE_KEY=[your-anon-key]
-   VITE_SUPABASE_URL=https://qadtpwdokdfqtpvwwhsn.supabase.co
+   VITE_SUPABASE_URL=https://sublzjeyxfaxiekacfme.supabase.co
    ```
 
 5. **Deploy**
@@ -275,9 +275,9 @@ Cloudflare Pages offers excellent performance with global CDN.
 
 4. **Environment Variables**
    ```
-   VITE_SUPABASE_PROJECT_ID=qadtpwdokdfqtpvwwhsn
+   VITE_SUPABASE_PROJECT_ID=sublzjeyxfaxiekacfme
    VITE_SUPABASE_PUBLISHABLE_KEY=[your-anon-key]
-   VITE_SUPABASE_URL=https://qadtpwdokdfqtpvwwhsn.supabase.co
+   VITE_SUPABASE_URL=https://sublzjeyxfaxiekacfme.supabase.co
    ```
 
 5. **Deploy**
@@ -363,19 +363,19 @@ export default defineConfig(({ mode }) => ({
 ### Getting Your Supabase Keys
 
 1. Go to [Supabase Dashboard](https://supabase.com/dashboard)
-2. Select project `qadtpwdokdfqtpvwwhsn`
+2. Select project `sublzjeyxfaxiekacfme`
 3. Go to Settings → API
 4. Copy these values:
-   - **Project URL**: `https://qadtpwdokdfqtpvwwhsn.supabase.co`
+   - **Project URL**: `https://sublzjeyxfaxiekacfme.supabase.co`
    - **anon public**: This is your `VITE_SUPABASE_PUBLISHABLE_KEY`
 
 ### Environment Variables Summary
 
 ```env
 # Required for all deployments
-VITE_SUPABASE_PROJECT_ID=qadtpwdokdfqtpvwwhsn
+VITE_SUPABASE_PROJECT_ID=sublzjeyxfaxiekacfme
 VITE_SUPABASE_PUBLISHABLE_KEY=[from Supabase Dashboard]
-VITE_SUPABASE_URL=https://qadtpwdokdfqtpvwwhsn.supabase.co
+VITE_SUPABASE_URL=https://sublzjeyxfaxiekacfme.supabase.co
 ```
 
 ## Removing Lovable Dependencies

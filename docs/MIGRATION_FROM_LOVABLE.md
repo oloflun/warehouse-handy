@@ -98,7 +98,7 @@ cd warehouse-handy
 
 # 2. Create database backup (requires PostgreSQL tools)
 # Get connection string from Supabase Dashboard → Settings → Database
-pg_dump "postgresql://postgres:[PASSWORD]@db.qadtpwdokdfqtpvwwhsn.supabase.co:5432/postgres" \
+pg_dump "postgresql://postgres:[PASSWORD]@db.sublzjeyxfaxiekacfme.supabase.co:5432/postgres" \
   > backup_pre_migration_$(date +%Y%m%d).sql
 
 # Or use the backup script
@@ -172,9 +172,9 @@ npm run build
 
 3. **Configure Environment Variables**
    ```
-   VITE_SUPABASE_PROJECT_ID=qadtpwdokdfqtpvwwhsn
+   VITE_SUPABASE_PROJECT_ID=sublzjeyxfaxiekacfme
    VITE_SUPABASE_PUBLISHABLE_KEY=[from-supabase-dashboard]
-   VITE_SUPABASE_URL=https://qadtpwdokdfqtpvwwhsn.supabase.co
+   VITE_SUPABASE_URL=https://sublzjeyxfaxiekacfme.supabase.co
    ```
 
 4. **Deploy**
@@ -214,7 +214,7 @@ See `docs/DEPLOYMENT_GUIDE.md` for detailed instructions for:
 
 1. **Update Redirect URLs**
    - Go to [Supabase Dashboard](https://supabase.com/dashboard)
-   - Select project `qadtpwdokdfqtpvwwhsn`
+   - Select project `sublzjeyxfaxiekacfme`
    - Go to Authentication → URL Configuration
    - Add new deployment URL to "Redirect URLs"
    
@@ -377,7 +377,7 @@ If data issues occur:
 
 ```bash
 # Restore database from backup
-psql "postgresql://postgres:[PASSWORD]@db.qadtpwdokdfqtpvwwhsn.supabase.co:5432/postgres" \
+psql "postgresql://postgres:[PASSWORD]@db.sublzjeyxfaxiekacfme.supabase.co:5432/postgres" \
   < backup_pre_migration_YYYYMMDD.sql
 ```
 

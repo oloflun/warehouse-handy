@@ -1,6 +1,6 @@
 # Migration Summary: Lovable Cloud to Independent Deployment
 
-**Date**: November 5, 2025  
+**Date**: November 5, 2024  
 **Project**: Warehouse Handy  
 **Status**: ✅ Complete and Ready for Deployment
 
@@ -176,9 +176,9 @@ User-friendly quick start guide created:
 Three environment variables required:
 
 ```env
-VITE_SUPABASE_PROJECT_ID=qadtpwdokdfqtpvwwhsn
+VITE_SUPABASE_PROJECT_ID=sublzjeyxfaxiekacfme
 VITE_SUPABASE_PUBLISHABLE_KEY=[from-supabase-dashboard]
-VITE_SUPABASE_URL=https://qadtpwdokdfqtpvwwhsn.supabase.co
+VITE_SUPABASE_URL=https://sublzjeyxfaxiekacfme.supabase.co
 ```
 
 **Security Note**: The publishable key is safe to expose (anon key), but the service role key should NEVER be committed or exposed.
@@ -372,4 +372,4 @@ The Warehouse Handy application is now fully independent of Lovable Cloud and re
 
 ---
 
-*This migration was completed on November 5, 2025, with comprehensive documentation and backup procedures in place.*
+*This migration was completed on November 5, 2024, with comprehensive documentation and backup procedures in place.*

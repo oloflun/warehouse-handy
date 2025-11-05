@@ -539,7 +539,7 @@ See `docs/BACKUP_AND_RESTORE.md` for detailed backup and restore procedures.
 
 ### Quick Backup
 ```bash
-pg_dump "postgresql://postgres:[PASSWORD]@db.qadtpwdokdfqtpvwwhsn.supabase.co:5432/postgres" \
+pg_dump "postgresql://postgres:[PASSWORD]@db.sublzjeyxfaxiekacfme.supabase.co:5432/postgres" \
   > backup_$(date +%Y%m%d).sql
 ```
 
