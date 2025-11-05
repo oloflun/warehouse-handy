@@ -130,6 +130,7 @@ Comprehensive documentation is available in the `/docs` directory:
 - **[DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md)** - Complete deployment instructions
 - **[BACKUP_AND_RESTORE.md](docs/BACKUP_AND_RESTORE.md)** - Backup and disaster recovery procedures
 - **[DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md)** - Complete database schema documentation
+- **[SECURITY.md](docs/SECURITY.md)** - Security best practices and API key management
 - **[EMAIL_CONFIGURATION.md](docs/EMAIL_CONFIGURATION.md)** - Email/SMTP setup guide
 - **[USER_MANAGEMENT_CHANGES.md](docs/USER_MANAGEMENT_CHANGES.md)** - User system documentation
 - **[USER_MANAGEMENT_TEST_PLAN.md](docs/USER_MANAGEMENT_TEST_PLAN.md)** - Testing procedures
@@ -188,7 +189,11 @@ The system supports hierarchical user roles:
 - Database security enforced via Row Level Security (RLS) policies
 - User authentication handled by Supabase Auth
 - Environment variables for sensitive configuration
+- **Anon key is safe for frontend use** (protected by RLS)
+- Service role key must NEVER be in frontend code
 - Regular security audits recommended
+
+**Important**: See [docs/SECURITY.md](docs/SECURITY.md) for detailed security information.
 
 Report security vulnerabilities to: oloflundin@icloud.com
 

@@ -75,8 +75,10 @@ npm run dev
 3. Go to Settings → API
 4. Copy these values:
    - **Project URL** → `VITE_SUPABASE_URL`
-   - **anon public** → `VITE_SUPABASE_PUBLISHABLE_KEY`
+   - **anon public** → `VITE_SUPABASE_PUBLISHABLE_KEY` ✅ Safe for frontend
    - **Project Reference** → `VITE_SUPABASE_PROJECT_ID` (from URL)
+
+⚠️ **Important**: Only use the `anon public` key in your frontend. Never use the `service_role` key in frontend code! See [docs/SECURITY.md](docs/SECURITY.md) for details.
 
 ## First Steps After Deployment
 

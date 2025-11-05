@@ -96,6 +96,18 @@ Welcome to the Warehouse Handy documentation! This directory contains comprehens
 
 ---
 
+### 🔐 Security
+
+#### **[SECURITY.md](SECURITY.md)** ⭐ Important
+- API key security (anon vs service_role)
+- Which keys are safe to expose
+- Row Level Security (RLS) explanation
+- Edge Function security
+- Security best practices
+- Incident response procedures
+
+**Read this to understand how to handle API keys safely!**
+
 ### 📧 Configuration
 
 #### **[EMAIL_CONFIGURATION.md](EMAIL_CONFIGURATION.md)**
