@@ -131,7 +131,7 @@ ALWAYS return valid JSON. No markdown, no explanations.`
         details: error instanceof Error ? error.stack : undefined
       }),
       { 
-        status: 500,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );

@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
       console.error('❌ Failed to fetch sync failures:', fetchError);
       return new Response(
         JSON.stringify({ error: 'Failed to fetch sync failures' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
     console.error('❌ Error in retry-failed-syncs:', error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

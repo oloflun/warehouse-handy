@@ -80,12 +80,23 @@ const FDTExplorer = () => {
   const checkConfiguration = async () => {
     try {
       // Make a simple test call to check if env vars are configured
-      const { error } = await supabase.functions.invoke("fdt-api-explorer", {
+      const { data, error } = await supabase.functions.invoke("fdt-api-explorer", {
         body: { endpoint: "items", method: "GET" },
       });
       
       if (error) {
-        const errorMsg = error.message || String(error);
+        // Supabase-level error (should be rare now)
+        setConfigStatus({
+          hasBaseUrl: false,
+          hasApiKey: false,
+          message: "Unable to verify configuration",
+        });
+        return;
+      }
+      
+      if (data && !data.success && data.error) {
+        // API call failed - check error message
+        const errorMsg = data.error;
         if (errorMsg.includes("FDT_SELLUS_BASE_URL not configured")) {
           setConfigStatus({
             hasBaseUrl: false,

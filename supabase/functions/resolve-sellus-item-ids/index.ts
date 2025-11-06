@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
       console.error('Error fetching products:', fetchError);
       return new Response(
         JSON.stringify({ success: false, error: 'Failed to fetch products' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
           success: false, 
           error: 'Could not fetch items from Sellus API',
         }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -156,7 +156,7 @@ Deno.serve(async (req) => {
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error' 
       }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
