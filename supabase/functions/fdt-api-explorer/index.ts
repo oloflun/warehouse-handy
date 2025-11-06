@@ -46,6 +46,14 @@ Deno.serve(async (req) => {
       
       console.log(`[FDT Explorer] Config check - baseUrl: ${hasBaseUrl}, apiKey: ${hasApiKey}`);
       
+      // Build missing variables message
+      const missingVars = [];
+      if (!hasBaseUrl) missingVars.push('FDT_SELLUS_BASE_URL');
+      if (!hasApiKey) missingVars.push('FDT_SELLUS_API_KEY');
+      const missingMessage = missingVars.length > 0 
+        ? `Missing: ${missingVars.join(' and ')}` 
+        : 'Configuration is valid';
+      
       return new Response(
         JSON.stringify({
           success: isConfigured,
@@ -54,9 +62,7 @@ Deno.serve(async (req) => {
             hasApiKey,
             isConfigured,
           },
-          message: isConfigured 
-            ? 'Configuration is valid' 
-            : `Missing: ${!hasBaseUrl ? 'FDT_SELLUS_BASE_URL' : ''}${!hasBaseUrl && !hasApiKey ? ' and ' : ''}${!hasApiKey ? 'FDT_SELLUS_API_KEY' : ''}`,
+          message: missingMessage,
         }),
         {
           status: 200,

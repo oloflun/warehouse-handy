@@ -80,8 +80,9 @@ const FDTExplorer = () => {
   const checkConfiguration = async () => {
     try {
       // Use the new verifyConfigOnly mode to check env vars without making an API call
+      // Note: endpoint is ignored when verifyConfigOnly is true, but required by the API
       const { data, error } = await supabase.functions.invoke("fdt-api-explorer", {
-        body: { endpoint: "verify", method: "GET", verifyConfigOnly: true },
+        body: { endpoint: "/verify", method: "GET", verifyConfigOnly: true },
       });
       
       if (error) {
@@ -108,15 +109,18 @@ const FDTExplorer = () => {
       } else if (data && !data.success && data.error) {
         // Fallback to old error message parsing for backwards compatibility
         const errorMsg = data.error;
+        const hasBaseUrl = data.configStatus?.hasBaseUrl ?? true; // Default to true for backwards compat
+        const hasApiKey = data.configStatus?.hasApiKey ?? true;   // Default to true for backwards compat
+        
         if (errorMsg.includes("FDT_SELLUS_BASE_URL not configured")) {
           setConfigStatus({
             hasBaseUrl: false,
-            hasApiKey: data.configStatus?.hasApiKey ?? false,
+            hasApiKey,
             message: "FDT_SELLUS_BASE_URL not configured in environment variables",
           });
         } else if (errorMsg.includes("FDT_SELLUS_API_KEY not configured")) {
           setConfigStatus({
-            hasBaseUrl: data.configStatus?.hasBaseUrl ?? true,
+            hasBaseUrl,
             hasApiKey: false,
             message: "FDT_SELLUS_API_KEY not configured in environment variables",
           });
