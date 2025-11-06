@@ -109,8 +109,28 @@ const FDTExplorer = () => {
       } else if (data && !data.success && data.error) {
         // Fallback to old error message parsing for backwards compatibility
         const errorMsg = data.error;
-        const hasBaseUrl = data.configStatus?.hasBaseUrl ?? true; // Default to true for backwards compat
-        const hasApiKey = data.configStatus?.hasApiKey ?? true;   // Default to true for backwards compat
+        
+        // Try to infer from error message if configStatus is not available
+        let hasBaseUrl = false;
+        let hasApiKey = false;
+        
+        if (data.configStatus) {
+          hasBaseUrl = data.configStatus.hasBaseUrl;
+          hasApiKey = data.configStatus.hasApiKey;
+        } else {
+          // Backwards compat: try to infer from error message
+          if (errorMsg.includes("FDT_SELLUS_BASE_URL not configured")) {
+            hasBaseUrl = false;
+            hasApiKey = true; // Assume API key is configured if only base URL error
+          } else if (errorMsg.includes("FDT_SELLUS_API_KEY not configured")) {
+            hasBaseUrl = true; // Assume base URL is configured if only API key error
+            hasApiKey = false;
+          } else if (errorMsg.includes("FDT API credentials not configured")) {
+            // Both missing
+            hasBaseUrl = false;
+            hasApiKey = false;
+          }
+        }
         
         if (errorMsg.includes("FDT_SELLUS_BASE_URL not configured")) {
           setConfigStatus({
@@ -126,8 +146,8 @@ const FDTExplorer = () => {
           });
         } else {
           setConfigStatus({
-            hasBaseUrl: false,
-            hasApiKey: false,
+            hasBaseUrl,
+            hasApiKey,
             message: errorMsg,
           });
         }

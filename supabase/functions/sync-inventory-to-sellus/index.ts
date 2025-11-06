@@ -36,13 +36,6 @@ Deno.serve(async (req) => {
 
     if (error) throw error;
 
-    let syncedCount = 0;
-    let skippedCount = 0;
-    let errorCount = 0;
-    const errors: Array<{ product: string; error: string }> = [];
-
-    console.log(`📦 Found ${products.length} products with Sellus article IDs`);
-
     if (!products || products.length === 0) {
       console.warn('⚠️ No products found with FDT Sellus article IDs');
       return new Response(
@@ -56,6 +49,13 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    let syncedCount = 0;
+    let skippedCount = 0;
+    let errorCount = 0;
+    const errors: Array<{ product: string; error: string }> = [];
+
+    console.log(`📦 Found ${products.length} products with Sellus article IDs`);
 
     for (const product of products) {
       try {

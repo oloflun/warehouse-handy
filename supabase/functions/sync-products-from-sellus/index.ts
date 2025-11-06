@@ -20,13 +20,15 @@ Deno.serve(async (req) => {
     );
   }
 
+  const branchId = Deno.env.get('FDT_SELLUS_BRANCH_ID') || '5';
+
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    console.log('🔄 Starting product sync from FDT Sellus...');
+    console.log(`🔄 Starting product sync from FDT Sellus (branchId: ${branchId})...`);
 
     // Step 1: Fetch product groups and find "1200- Elon"
     console.log('📋 Fetching product groups...');
@@ -54,9 +56,9 @@ Deno.serve(async (req) => {
     const elonGroupId = elonGroup.id || elonGroup.productGroupId;
 
     // Step 2: Fetch products filtered by product group
-    console.log(`🌐 Fetching items from productGroupId=${elonGroupId}`);
+    console.log(`🌐 Fetching items from productGroupId=${elonGroupId} and branchId=${branchId}`);
     let result = await callFDTApi({
-      endpoint: `/items?branchId=5&productGroupId=${elonGroupId}`,
+      endpoint: `/items?branchId=${branchId}&productGroupId=${elonGroupId}`,
       method: 'GET',
     });
 
@@ -77,7 +79,7 @@ Deno.serve(async (req) => {
     if (!articles || articles.length === 0) {
       console.log('⚠️ /items returned no data, trying /items/full...');
       result = await callFDTApi({
-        endpoint: '/items/full?branchId=5',
+        endpoint: `/items/full?branchId=${branchId}`,
         method: 'GET',
       });
 
@@ -97,7 +99,7 @@ Deno.serve(async (req) => {
     if (!articles || articles.length === 0) {
       const errorMsg = 'No products found from FDT API. This could mean: 1) API credentials are invalid, 2) Branch ID is wrong, 3) Product group "1200- Elon" has no products, or 4) API response structure changed.';
       console.error(`❌ ${errorMsg}`);
-      console.error(`🔍 Debug info: branchId=5, productGroupId=${elonGroupId}`);
+      console.error(`🔍 Debug info: branchId=${branchId}, productGroupId=${elonGroupId}`);
       
       return new Response(
         JSON.stringify({
@@ -106,7 +108,7 @@ Deno.serve(async (req) => {
           synced: 0,
           errors: 0,
           debugInfo: {
-            branchId: 5,
+            branchId: branchId,
             productGroupId: elonGroupId,
             elonGroup: elonGroup,
             responseStructure: Object.keys(result.data || {})
