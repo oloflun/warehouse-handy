@@ -15,13 +15,13 @@ interface ApiResponse {
   success: boolean;
   status?: number;
   statusText?: string;
-  data?: any;
+  data?: unknown;
   authStrategy?: string;
   duration_ms?: number;
   url?: string;
   method?: string;
   error?: string;
-  lastError?: any;
+  lastError?: Record<string, unknown>;
 }
 
 interface HistoryItem {
