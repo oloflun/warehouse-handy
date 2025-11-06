@@ -20,7 +20,7 @@ async function tryFetchWithAuth(url: string, method: string, body: any, authHead
     },
   };
 
-  if (body && (method === 'POST' || method === 'PUT')) {
+  if (body && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
     options.body = JSON.stringify(body);
   }
 
@@ -52,10 +52,20 @@ Deno.serve(async (req) => {
 
     console.log(`[FDT Explorer] Full URL: ${fullUrl}`);
 
-    // Try different auth strategies
+    // Try different auth strategies (comprehensive list to match working edge functions)
     const authStrategies: Array<{ name: string; header: Record<string, string> }> = [
-      { name: 'Bearer Token', header: apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {} },
-      { name: 'X-API-Key', header: apiKey ? { 'X-API-Key': apiKey } : {} },
+      { name: 'Bearer', header: apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {} },
+      { name: 'X-Api-Key', header: apiKey ? { 'X-Api-Key': apiKey } : {} },
+      { name: 'ApiKey', header: apiKey ? { 'Authorization': `ApiKey ${apiKey}` } : {} },
+      { name: 'Token', header: apiKey ? { 'Authorization': `Token ${apiKey}` } : {} },
+      { name: 'Ocp-Apim-Subscription-Key', header: apiKey ? { 'Ocp-Apim-Subscription-Key': apiKey } : {} },
+      { name: 'x-subscription-key', header: apiKey ? { 'x-subscription-key': apiKey } : {} },
+      { name: 'Subscription-Key', header: apiKey ? { 'Subscription-Key': apiKey } : {} },
+      { name: 'apikey', header: apiKey ? { 'apikey': apiKey } : {} },
+      { name: 'api-key', header: apiKey ? { 'api-key': apiKey } : {} },
+      { name: 'X-API-KEY', header: apiKey ? { 'X-API-KEY': apiKey } : {} },
+      { name: 'X-ApiKey', header: apiKey ? { 'X-ApiKey': apiKey } : {} },
+      { name: 'X-Authorization', header: apiKey ? { 'X-Authorization': apiKey } : {} },
       { name: 'No Auth', header: {} },
     ];
 
