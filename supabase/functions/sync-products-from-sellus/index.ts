@@ -95,7 +95,28 @@ Deno.serve(async (req) => {
     }
 
     if (!articles || articles.length === 0) {
-      console.log('⚠️ No products found from FDT API - check API endpoint or branchId');
+      const errorMsg = 'No products found from FDT API. This could mean: 1) API credentials are invalid, 2) Branch ID is wrong, 3) Product group "1200- Elon" has no products, or 4) API response structure changed.';
+      console.error(`❌ ${errorMsg}`);
+      console.error(`🔍 Debug info: branchId=5, productGroupId=${elonGroupId}`);
+      
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: errorMsg,
+          synced: 0,
+          errors: 0,
+          debugInfo: {
+            branchId: 5,
+            productGroupId: elonGroupId,
+            elonGroup: elonGroup,
+            responseStructure: Object.keys(result.data || {})
+          }
+        }),
+        { 
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
     
     console.log(`📦 Total ${articles.length} products to sync from varugrupp 1200- Elon`);
