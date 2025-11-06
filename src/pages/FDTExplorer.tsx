@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Play, Clock, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, Play, Clock, CheckCircle, XCircle, Loader2, AlertCircle, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -38,9 +39,17 @@ const PREDEFINED_ENDPOINTS = [
   { value: "items/{id}", label: "Specifik produkt (/items/{id})" },
   { value: "items/{id}/orders", label: "Ordrar för artikel (/items/{id}/orders)" },
   { value: "orders", label: "Ordrar (/orders)" },
+  { value: "orders/{id}", label: "Specifik order (/orders/{id})" },
   { value: "customers", label: "Kunder (/customers)" },
+  { value: "customers/{id}", label: "Specifik kund (/customers/{id})" },
   { value: "branches", label: "Butiker/Lager (/branches)" },
+  { value: "branches/{id}", label: "Specifik butik/lager (/branches/{id})" },
   { value: "suppliers", label: "Leverantörer (/suppliers)" },
+  { value: "suppliers/{id}", label: "Specifik leverantör (/suppliers/{id})" },
+  { value: "productgroups", label: "Varugrupper (/productgroups)" },
+  { value: "productgroups/{id}", label: "Specifik varugrupp (/productgroups/{id})" },
+  { value: "inventory", label: "Lagersaldo (/inventory)" },
+  { value: "inventory/{id}", label: "Specifikt lagersaldo (/inventory/{id})" },
   { value: "custom", label: "Anpassad endpoint..." },
 ];
 
@@ -57,6 +66,61 @@ const FDTExplorer = () => {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [articleId, setArticleId] = useState("");
   const [branchId, setBranchId] = useState("5");
+  const [configStatus, setConfigStatus] = useState<{
+    hasBaseUrl: boolean;
+    hasApiKey: boolean;
+    message: string;
+  } | null>(null);
+
+  // Check configuration on mount
+  useEffect(() => {
+    checkConfiguration();
+  }, []);
+
+  const checkConfiguration = async () => {
+    try {
+      // Make a simple test call to check if env vars are configured
+      const { error } = await supabase.functions.invoke("fdt-api-explorer", {
+        body: { endpoint: "items", method: "GET" },
+      });
+      
+      if (error) {
+        const errorMsg = error.message || String(error);
+        if (errorMsg.includes("FDT_SELLUS_BASE_URL not configured")) {
+          setConfigStatus({
+            hasBaseUrl: false,
+            hasApiKey: false,
+            message: "FDT_SELLUS_BASE_URL not configured in environment variables",
+          });
+        } else if (errorMsg.includes("FDT_SELLUS_API_KEY not configured")) {
+          setConfigStatus({
+            hasBaseUrl: true,
+            hasApiKey: false,
+            message: "FDT_SELLUS_API_KEY not configured in environment variables",
+          });
+        } else {
+          setConfigStatus({
+            hasBaseUrl: true,
+            hasApiKey: true,
+            message: "Configuration appears valid. Ready to test endpoints.",
+          });
+        }
+      } else {
+        setConfigStatus({
+          hasBaseUrl: true,
+          hasApiKey: true,
+          message: "Configuration appears valid. Ready to test endpoints.",
+        });
+      }
+    } catch (error) {
+      console.error("Config check error:", error);
+      setConfigStatus({
+        hasBaseUrl: false,
+        hasApiKey: false,
+        message: "Unable to verify configuration",
+      });
+    }
+  };
 
   const getEndpoint = () => {
     let endpoint = selectedEndpoint === "custom" ? customEndpoint : selectedEndpoint;
@@ -157,6 +221,29 @@ const FDTExplorer = () => {
             </div>
           </div>
         </div>
+
+        {/* Configuration Status Alert */}
+        {configStatus && !configStatus.hasBaseUrl && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Configuration Error</AlertTitle>
+            <AlertDescription>
+              {configStatus.message}
+              <br />
+              <span className="text-xs mt-2 block">
+                Please configure FDT_SELLUS_BASE_URL and FDT_SELLUS_API_KEY in your Supabase Edge Function environment variables.
+              </span>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {configStatus && configStatus.hasBaseUrl && configStatus.hasApiKey && (
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertTitle>Configuration Status</AlertTitle>
+            <AlertDescription>{configStatus.message}</AlertDescription>
+          </Alert>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Request Builder */}
@@ -336,6 +423,15 @@ const FDTExplorer = () => {
                     {JSON.stringify(response.data, null, 2)}
                   </pre>
                 </div>
+                {response.data && typeof response.data === 'object' && (
+                  <div className="text-xs text-muted-foreground">
+                    <span className="font-medium">Response info:</span> 
+                    {Array.isArray(response.data) 
+                      ? ` Array med ${response.data.length} element`
+                      : ` Object med ${Object.keys(response.data).length} nycklar`
+                    }
+                  </div>
+                )}
               </>
             ) : (
               <>
@@ -343,13 +439,28 @@ const FDTExplorer = () => {
                   <XCircle className="h-5 w-5" />
                   <span className="font-medium">API-anropet misslyckades</span>
                 </div>
-                <div className="bg-muted p-4 rounded-lg">
-                  <p className="text-sm text-red-600">{response.error}</p>
+                <div className="bg-muted p-4 rounded-lg space-y-3">
+                  <div>
+                    <p className="text-sm font-medium text-red-600 mb-2">Error Message:</p>
+                    <p className="text-sm text-red-600">{response.error}</p>
+                  </div>
                   {response.lastError && (
-                    <pre className="text-xs font-mono mt-2 text-muted-foreground">
-                      {JSON.stringify(response.lastError, null, 2)}
-                    </pre>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground mb-2">Details:</p>
+                      <pre className="text-xs font-mono text-muted-foreground">
+                        {JSON.stringify(response.lastError, null, 2)}
+                      </pre>
+                    </div>
                   )}
+                  <div className="pt-2 border-t">
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-medium">Troubleshooting:</span>
+                      <br />• Verify API credentials are configured correctly
+                      <br />• Check that the endpoint URL is valid
+                      <br />• Ensure the article ID exists if using {"{id}"} placeholder
+                      <br />• Try different endpoints to isolate the issue
+                    </p>
+                  </div>
                 </div>
               </>
             )}
