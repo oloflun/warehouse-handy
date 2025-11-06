@@ -10,6 +10,7 @@ interface ExplorerRequest {
   endpoint: string;
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
+  verifyConfigOnly?: boolean;
 }
 
 Deno.serve(async (req) => {
@@ -29,20 +30,75 @@ Deno.serve(async (req) => {
   const startTime = Date.now();
   
   try {
-    const { endpoint, method = 'GET', body }: ExplorerRequest = await req.json();
+    const { endpoint, method = 'GET', body, verifyConfigOnly = false }: ExplorerRequest = await req.json();
     
-    console.log(`[FDT Explorer] Testing endpoint: ${method} ${endpoint}`);
+    console.log(`[FDT Explorer] Testing endpoint: ${method} ${endpoint}, verifyConfigOnly: ${verifyConfigOnly}`);
 
     // Validate environment variables
     const baseUrl = Deno.env.get('FDT_SELLUS_BASE_URL');
     const apiKey = Deno.env.get('FDT_SELLUS_API_KEY');
 
+    // If only verifying configuration, return status without making API call
+    if (verifyConfigOnly) {
+      const hasBaseUrl = !!baseUrl;
+      const hasApiKey = !!apiKey;
+      const isConfigured = hasBaseUrl && hasApiKey;
+      
+      console.log(`[FDT Explorer] Config check - baseUrl: ${hasBaseUrl}, apiKey: ${hasApiKey}`);
+      
+      return new Response(
+        JSON.stringify({
+          success: isConfigured,
+          configStatus: {
+            hasBaseUrl,
+            hasApiKey,
+            isConfigured,
+          },
+          message: isConfigured 
+            ? 'Configuration is valid' 
+            : `Missing: ${!hasBaseUrl ? 'FDT_SELLUS_BASE_URL' : ''}${!hasBaseUrl && !hasApiKey ? ' and ' : ''}${!hasApiKey ? 'FDT_SELLUS_API_KEY' : ''}`,
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     if (!baseUrl) {
-      throw new Error('FDT_SELLUS_BASE_URL not configured');
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'FDT_SELLUS_BASE_URL not configured',
+          configStatus: {
+            hasBaseUrl: false,
+            hasApiKey: !!apiKey,
+            isConfigured: false,
+          },
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     if (!apiKey) {
-      throw new Error('FDT_SELLUS_API_KEY not configured');
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'FDT_SELLUS_API_KEY not configured',
+          configStatus: {
+            hasBaseUrl: true,
+            hasApiKey: false,
+            isConfigured: false,
+          },
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     // Clean endpoint - ensure it starts with /
