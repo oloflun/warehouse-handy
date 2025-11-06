@@ -54,7 +54,6 @@ export async function callFDTApi({ endpoint, method = 'GET', body }: FDTApiOptio
   ];
   
   let lastResponse: Response | null = null;
-  const lastError: Error | null = null;
   let wwwAuthenticate: string | null = null;
   const triedStrategies: string[] = [];
   
@@ -181,7 +180,24 @@ export async function callFDTApi({ endpoint, method = 'GET', body }: FDTApiOptio
   }
 }
 
-export async function logSync(supabase: unknown, logData: {
+// Define a minimal interface for the Supabase client operations we use
+interface SupabaseClient {
+  from: (table: string) => {
+    insert: (data: {
+      sync_type: string;
+      direction: string;
+      fdt_article_id?: string;
+      wms_product_id?: string;
+      status: string;
+      request_payload?: unknown;
+      response_payload?: unknown;
+      error_message?: string;
+      duration_ms: number;
+    }) => Promise<unknown>;
+  };
+}
+
+export async function logSync(supabase: SupabaseClient, logData: {
   sync_type: string;
   direction: string;
   fdt_article_id?: string;
@@ -192,11 +208,5 @@ export async function logSync(supabase: unknown, logData: {
   error_message?: string;
   duration_ms: number;
 }) {
-  // Type assertion for supabase client
-  const client = supabase as {
-    from: (table: string) => {
-      insert: (data: typeof logData) => Promise<unknown>;
-    };
-  };
-  await client.from('fdt_sync_log').insert(logData);
+  await supabase.from('fdt_sync_log').insert(logData);
 }
