@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Play, Clock, CheckCircle, XCircle, Loader2, AlertCircle, Info } from "lucide-react";
+import { ArrowLeft, Play, Clock, CheckCircle, XCircle, Loader2, AlertCircle, Info, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -139,6 +139,44 @@ const FDTExplorer = () => {
     return endpoint;
   };
 
+  const testConnection = async () => {
+    setIsLoading(true);
+    setResponse(null);
+    
+    try {
+      // Test with a simple endpoint that should always work
+      const { data, error } = await supabase.functions.invoke("fdt-api-explorer", {
+        body: { endpoint: "productgroups", method: "GET" },
+      });
+
+      if (error) throw error;
+
+      setResponse(data);
+
+      if (data.success) {
+        toast.success("Anslutning lyckades! FDT API fungerar korrekt.");
+        // Update config status
+        setConfigStatus({
+          hasBaseUrl: true,
+          hasApiKey: true,
+          message: "Configuration verified successfully",
+        });
+      } else {
+        toast.error("Anslutningstest misslyckades. Se detaljer nedan.");
+      }
+    } catch (error: unknown) {
+      console.error("Connection test error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Ett fel inträffade";
+      toast.error(`Anslutningstest misslyckades: ${errorMessage}`);
+      setResponse({
+        success: false,
+        error: errorMessage,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleTest = async () => {
     const endpoint = getEndpoint();
     if (!endpoint) {
@@ -187,12 +225,13 @@ const FDTExplorer = () => {
       } else {
         toast.error("API-anrop misslyckades");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Explorer error:", error);
-      toast.error(error.message || "Ett fel inträffade");
+      const errorMessage = error instanceof Error ? error.message : "Ett fel inträffade";
+      toast.error(errorMessage);
       setResponse({
         success: false,
-        error: error.message,
+        error: errorMessage,
       });
     } finally {
       setIsLoading(false);
@@ -204,6 +243,11 @@ const FDTExplorer = () => {
     if (status >= 200 && status < 300) return "bg-green-500";
     if (status >= 400 && status < 500) return "bg-yellow-500";
     return "bg-red-500";
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success("Kopierad till urklipp!");
   };
 
   return (
@@ -220,6 +264,23 @@ const FDTExplorer = () => {
               <p className="text-muted-foreground">Testa och utforska FDT Sellus API endpoints</p>
             </div>
           </div>
+          <Button 
+            variant="outline" 
+            onClick={testConnection}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Testar...
+              </>
+            ) : (
+              <>
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Testa anslutning
+              </>
+            )}
+          </Button>
         </div>
 
         {/* Configuration Status Alert */}
@@ -395,6 +456,16 @@ const FDTExplorer = () => {
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold">Response</h2>
               <div className="flex gap-2">
+                {response.success && response.data && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copyToClipboard(JSON.stringify(response.data, null, 2))}
+                  >
+                    <Copy className="h-4 w-4 mr-2" />
+                    Kopiera
+                  </Button>
+                )}
                 {response.status && (
                   <Badge className={getStatusColor(response.status)}>
                     {response.status} {response.statusText}
