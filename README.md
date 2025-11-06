@@ -74,13 +74,12 @@ Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/c
 
 ## Deployment Configuration
 
-This project is configured to deploy automatically to Vercel only when changes are pushed or merged to the `main` branch.
+Automatic Vercel deployments from GitHub are currently disabled via `vercel.json`.
 
 The deployment configuration is specified in `vercel.json`:
-- **Automatic deployments**: Enabled only for the `main` branch
-- **Feature branches**: Will not trigger production deployments
+- **Automatic deployments**: Disabled (`git.deploymentEnabled: false`)
 - **Framework**: Vite
 - **Build command**: `npm run build`
 - **Output directory**: `dist`
 
-This helps prevent unnecessary preview deployments and conserves resources for feature branches.
+To deploy, use manual deployments through the Vercel dashboard or via the Vercel CLI.
