@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
     if (!productId) {
       return new Response(
         JSON.stringify({ error: 'productId is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
       console.error('❌ Product not found:', productError);
       return new Response(
         JSON.stringify({ error: 'Product not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
       console.log('⚠️ Product has no Sellus article ID');
       return new Response(
         JSON.stringify({ error: 'Product has no Sellus article ID' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -218,7 +218,7 @@ Deno.serve(async (req) => {
 
       return new Response(
         JSON.stringify({ error: 'Failed to fetch items from Sellus' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -245,7 +245,7 @@ Deno.serve(async (req) => {
       
       return new Response(
         JSON.stringify({ error: 'Unexpected response structure from Sellus API' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -279,7 +279,7 @@ Deno.serve(async (req) => {
           error: 'Article not found in Sellus',
           articleId: product.fdt_sellus_article_id 
         }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -308,7 +308,7 @@ Deno.serve(async (req) => {
 
       return new Response(
         JSON.stringify({ error: 'Failed to update product' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -339,7 +339,7 @@ Deno.serve(async (req) => {
     console.error('❌ Error in auto-resolve-item-id:', error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

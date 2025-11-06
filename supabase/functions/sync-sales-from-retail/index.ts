@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
   if (!authHeader) {
     return new Response(
       JSON.stringify({ success: false, error: 'Unauthorized - missing authorization header' }),
-      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 

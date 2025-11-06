@@ -118,7 +118,7 @@ serve(async (req) => {
         confidence: "low"
       }), 
       {
-        status: 500,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );

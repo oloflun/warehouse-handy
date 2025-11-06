@@ -17,7 +17,7 @@ Deno.serve(async (req) => {
   if (!authHeader) {
     return new Response(
       JSON.stringify({ success: false, error: 'Unauthorized - missing authorization header' }),
-      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 
@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
     if (!productId || quantity === undefined) {
       return new Response(
         JSON.stringify({ success: false, error: 'productId and quantity required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
       console.error('Product not found:', productError);
       return new Response(
         JSON.stringify({ success: false, error: 'Product not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -124,7 +124,7 @@ Deno.serve(async (req) => {
             articleId: product.fdt_sellus_article_id,
             productName: product.name
           }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
     } else {
@@ -178,7 +178,7 @@ Deno.serve(async (req) => {
           error: errorMsg,
           details: getItemResponse.error
         }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -300,7 +300,7 @@ Deno.serve(async (req) => {
           error: 'Failed to update stock in Sellus',
           details: updateResponse.error 
         }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
   } catch (error) {
@@ -310,7 +310,7 @@ Deno.serve(async (req) => {
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error' 
       }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

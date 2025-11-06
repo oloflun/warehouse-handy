@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
   if (!authHeader) {
     return new Response(
       JSON.stringify({ success: false, error: 'Unauthorized - missing authorization header' }),
-      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 
@@ -371,7 +371,6 @@ Deno.serve(async (req) => {
     console.error('❌ Product sync error:', error);
     
     const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-    const isAuthError = errorMsg.includes('401') || errorMsg.toLowerCase().includes('auth');
     
     return new Response(
       JSON.stringify({
@@ -379,7 +378,7 @@ Deno.serve(async (req) => {
         error: errorMsg,
       }),
       { 
-        status: isAuthError ? 502 : 500,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
