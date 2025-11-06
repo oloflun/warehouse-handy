@@ -1,12 +1,26 @@
 -- Restore admin role and super-admin status for oloflundin@icloud.com (oloflun)
 -- This fixes the issue where admin permissions were lost after migration
 
+-- First, verify the user exists in auth.users
+DO $$
+DECLARE
+  user_exists BOOLEAN;
+BEGIN
+  SELECT EXISTS(SELECT 1 FROM auth.users WHERE email = 'oloflundin@icloud.com') 
+  INTO user_exists;
+  
+  IF NOT user_exists THEN
+    RAISE EXCEPTION 'User oloflundin@icloud.com does not exist in auth.users table';
+  END IF;
+END $$;
+
 -- Ensure the user has the admin role in user_roles table
 -- Using ON CONFLICT to make this migration idempotent and safe to re-run
+-- Note: 'admin' is a valid value in the app_role enum (defined in migration 20251103110911)
 INSERT INTO public.user_roles (user_id, role, created_by, is_super_admin)
 SELECT 
   id,
-  'admin'::app_role,
+  'admin'::app_role,  -- Cast to app_role enum for type safety
   id,  -- created_by is self
   true -- is_super_admin
 FROM auth.users
@@ -28,7 +42,7 @@ BEGIN
     AND ur.is_super_admin = true;
   
   IF user_count = 0 THEN
-    RAISE WARNING 'User oloflundin@icloud.com not found or admin role not properly set';
+    RAISE EXCEPTION 'Failed to restore admin role and super-admin status for oloflundin@icloud.com';
   ELSE
     RAISE NOTICE 'Successfully restored admin role and super-admin status for oloflundin@icloud.com';
   END IF;
