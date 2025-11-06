@@ -36,6 +36,20 @@ Deno.serve(async (req) => {
 
     if (error) throw error;
 
+    if (!products || products.length === 0) {
+      console.warn('⚠️ No products found with FDT Sellus article IDs');
+      return new Response(
+        JSON.stringify({
+          success: false,
+          synced: 0,
+          skipped: 0,
+          errors: 0,
+          message: 'No products with FDT Sellus article IDs found. Run sync-products-from-sellus first to import products.',
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     let syncedCount = 0;
     let skippedCount = 0;
     let errorCount = 0;

@@ -26,7 +26,16 @@ export async function callFDTApi({ endpoint, method = 'GET', body }: FDTApiOptio
   const apiKey = Deno.env.get('FDT_SELLUS_API_KEY');
   
   if (!baseUrl || !apiKey) {
-    throw new Error('FDT API credentials not configured');
+    const missingVars = [];
+    if (!baseUrl) missingVars.push('FDT_SELLUS_BASE_URL');
+    if (!apiKey) missingVars.push('FDT_SELLUS_API_KEY');
+    const errorMsg = `FDT API credentials not configured: Missing ${missingVars.join(' and ')}`;
+    console.error(`❌ ${errorMsg}`);
+    return {
+      success: false,
+      error: errorMsg,
+      duration: 0,
+    };
   }
 
   const startTime = Date.now();

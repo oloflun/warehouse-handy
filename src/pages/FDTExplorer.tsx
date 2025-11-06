@@ -79,56 +79,100 @@ const FDTExplorer = () => {
 
   const checkConfiguration = async () => {
     try {
-      // Make a simple test call to check if env vars are configured
+      // Use the new verifyConfigOnly mode to check env vars without making an API call
+      // Note: endpoint is ignored when verifyConfigOnly is true, but required by the API
       const { data, error } = await supabase.functions.invoke("fdt-api-explorer", {
-        body: { endpoint: "items", method: "GET" },
+        body: { endpoint: "/verify", method: "GET", verifyConfigOnly: true },
       });
       
       if (error) {
-        // Supabase-level error (should be rare now)
+        // Supabase-level error (network issue, function not deployed, etc.)
+        console.error("Supabase function invoke error:", error);
         setConfigStatus({
           hasBaseUrl: false,
           hasApiKey: false,
-          message: "Unable to verify configuration",
+          message: "Unable to verify configuration - Supabase function error",
         });
         return;
       }
       
-      if (data && !data.success && data.error) {
-        // API call failed - check error message
+      // Check if we got config status back
+      if (data && data.configStatus) {
+        const { hasBaseUrl, hasApiKey, isConfigured } = data.configStatus;
+        setConfigStatus({
+          hasBaseUrl,
+          hasApiKey,
+          message: data.message || (isConfigured 
+            ? "Configuration verified successfully" 
+            : "Configuration incomplete"),
+        });
+      } else if (data && !data.success && data.error) {
+        // Fallback to old error message parsing for backwards compatibility
         const errorMsg = data.error;
+        
+        // Try to infer from error message if configStatus is not available
+        let hasBaseUrl = false;
+        let hasApiKey = false;
+        
+        if (data.configStatus) {
+          hasBaseUrl = data.configStatus.hasBaseUrl;
+          hasApiKey = data.configStatus.hasApiKey;
+        } else {
+          // Backwards compat: try to infer from error message
+          if (errorMsg.includes("FDT_SELLUS_BASE_URL not configured")) {
+            hasBaseUrl = false;
+            hasApiKey = true; // Assume API key is configured if only base URL error
+          } else if (errorMsg.includes("FDT_SELLUS_API_KEY not configured")) {
+            hasBaseUrl = true; // Assume base URL is configured if only API key error
+            hasApiKey = false;
+          } else if (errorMsg.includes("FDT API credentials not configured")) {
+            // Both missing
+            hasBaseUrl = false;
+            hasApiKey = false;
+          }
+        }
+        
         if (errorMsg.includes("FDT_SELLUS_BASE_URL not configured")) {
           setConfigStatus({
             hasBaseUrl: false,
-            hasApiKey: false,
+            hasApiKey,
             message: "FDT_SELLUS_BASE_URL not configured in environment variables",
           });
         } else if (errorMsg.includes("FDT_SELLUS_API_KEY not configured")) {
           setConfigStatus({
-            hasBaseUrl: true,
+            hasBaseUrl,
             hasApiKey: false,
             message: "FDT_SELLUS_API_KEY not configured in environment variables",
           });
         } else {
           setConfigStatus({
-            hasBaseUrl: true,
-            hasApiKey: true,
-            message: "Configuration appears valid. Ready to test endpoints.",
+            hasBaseUrl,
+            hasApiKey,
+            message: errorMsg,
           });
         }
-      } else {
+      } else if (data && data.success) {
+        // Configuration is valid
         setConfigStatus({
           hasBaseUrl: true,
           hasApiKey: true,
-          message: "Configuration appears valid. Ready to test endpoints.",
+          message: "Configuration verified successfully",
+        });
+      } else {
+        // Unexpected response
+        console.error("Unexpected config check response:", data);
+        setConfigStatus({
+          hasBaseUrl: false,
+          hasApiKey: false,
+          message: "Unable to verify configuration - unexpected response",
         });
       }
     } catch (error) {
-      console.error("Config check error:", error);
+      console.error("Config check exception:", error);
       setConfigStatus({
         hasBaseUrl: false,
         hasApiKey: false,
-        message: "Unable to verify configuration",
+        message: "Unable to verify configuration - exception occurred",
       });
     }
   };
@@ -295,7 +339,7 @@ const FDTExplorer = () => {
         </div>
 
         {/* Configuration Status Alert */}
-        {configStatus && !configStatus.hasBaseUrl && (
+        {configStatus && (!configStatus.hasBaseUrl || !configStatus.hasApiKey) && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Configuration Error</AlertTitle>
@@ -303,7 +347,9 @@ const FDTExplorer = () => {
               {configStatus.message}
               <br />
               <span className="text-xs mt-2 block">
-                Please configure FDT_SELLUS_BASE_URL and FDT_SELLUS_API_KEY in your Supabase Edge Function environment variables.
+                Missing: {!configStatus.hasBaseUrl && "FDT_SELLUS_BASE_URL"}{!configStatus.hasBaseUrl && !configStatus.hasApiKey && " and "}{!configStatus.hasApiKey && "FDT_SELLUS_API_KEY"}
+                <br />
+                Please configure these in your Supabase Edge Function environment variables.
               </span>
             </AlertDescription>
           </Alert>
