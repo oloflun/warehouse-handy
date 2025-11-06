@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { callFDTApi, logSync } from '../_shared/fdt-api.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,24 +8,8 @@ const corsHeaders = {
 
 interface ExplorerRequest {
   endpoint: string;
-  method?: string;
-  body?: any;
-}
-
-async function tryFetchWithAuth(url: string, method: string, body: any, authHeader: Record<string, string>) {
-  const options: RequestInit = {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...authHeader,
-    },
-  };
-
-  if (body && (method === 'POST' || method === 'PUT')) {
-    options.body = JSON.stringify(body);
-  }
-
-  return await fetch(url, options);
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  body?: unknown;
 }
 
 Deno.serve(async (req) => {
@@ -48,6 +33,7 @@ Deno.serve(async (req) => {
     
     console.log(`[FDT Explorer] Testing endpoint: ${method} ${endpoint}`);
 
+    // Validate environment variables
     const baseUrl = Deno.env.get('FDT_SELLUS_BASE_URL');
     const apiKey = Deno.env.get('FDT_SELLUS_API_KEY');
 
@@ -55,106 +41,80 @@ Deno.serve(async (req) => {
       throw new Error('FDT_SELLUS_BASE_URL not configured');
     }
 
-    // Clean endpoint (remove leading slash if present)
-    const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
-    const fullUrl = `${baseUrl}/${cleanEndpoint}`;
-
-    console.log(`[FDT Explorer] Full URL: ${fullUrl}`);
-
-    // Try different auth strategies
-    const authStrategies: Array<{ name: string; header: Record<string, string> }> = [
-      { name: 'Bearer Token', header: apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {} },
-      { name: 'X-API-Key', header: apiKey ? { 'X-API-Key': apiKey } : {} },
-      { name: 'No Auth', header: {} },
-    ];
-
-    let lastError: any = null;
-    let successResponse = null;
-
-    for (const strategy of authStrategies) {
-      console.log(`[FDT Explorer] Trying auth strategy: ${strategy.name}`);
-
-      try {
-        const response = await tryFetchWithAuth(fullUrl, method, body, strategy.header);
-        const duration = Date.now() - startTime;
-        
-        console.log(`[FDT Explorer] ${strategy.name} - Status: ${response.status}`);
-
-        if (response.ok) {
-          const responseText = await response.text();
-          let responseData;
-          
-          try {
-            responseData = responseText ? JSON.parse(responseText) : null;
-          } catch {
-            responseData = responseText;
-          }
-
-          successResponse = {
-            success: true,
-            status: response.status,
-            statusText: response.statusText,
-            data: responseData,
-            authStrategy: strategy.name,
-            duration_ms: duration,
-            url: fullUrl,
-            method,
-          };
-
-          // Log to database
-          const supabase = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-          );
-
-          await supabase.from('fdt_sync_log').insert({
-            sync_type: 'api_explorer',
-            direction: 'fdt_to_wms',
-            status: 'success',
-            request_payload: { endpoint, method, body },
-            response_payload: responseData,
-            duration_ms: duration,
-          });
-
-          break;
-        } else {
-          lastError = {
-            status: response.status,
-            statusText: response.statusText,
-            strategy: strategy.name,
-          };
-        }
-      } catch (error) {
-        console.error(`[FDT Explorer] ${strategy.name} failed:`, error);
-        lastError = {
-          error: error instanceof Error ? error.message : String(error),
-          strategy: strategy.name,
-        };
-      }
+    if (!apiKey) {
+      throw new Error('FDT_SELLUS_API_KEY not configured');
     }
 
-    if (successResponse) {
-      return new Response(JSON.stringify(successResponse), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    // Clean endpoint - ensure it starts with /
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
 
-    // All strategies failed
+    console.log(`[FDT Explorer] Calling FDT API: ${method} ${cleanEndpoint}`);
+
+    // Use the robust shared callFDTApi function
+    const result = await callFDTApi({
+      endpoint: cleanEndpoint,
+      method,
+      body,
+    });
+
     const duration = Date.now() - startTime;
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: 'All authentication strategies failed',
-        lastError,
-        duration_ms: duration,
-        url: fullUrl,
-        method,
-      }),
-      {
-        status: lastError?.status || 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+
+    // Create Supabase client for logging
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+
+    if (result.success) {
+      // Log successful call
+      await logSync(supabase, {
+        sync_type: 'api_explorer',
+        direction: 'fdt_to_wms',
+        status: 'success',
+        request_payload: { endpoint: cleanEndpoint, method, body },
+        response_payload: result.data,
+        duration_ms: result.duration || duration,
+      });
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          status: 200,
+          statusText: 'OK',
+          data: result.data,
+          duration_ms: result.duration || duration,
+          url: `${baseUrl}${cleanEndpoint}`,
+          method,
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    } else {
+      // Log failed call
+      await logSync(supabase, {
+        sync_type: 'api_explorer',
+        direction: 'fdt_to_wms',
+        status: 'error',
+        request_payload: { endpoint: cleanEndpoint, method, body },
+        error_message: result.error || 'Unknown error',
+        duration_ms: result.duration || duration,
+      });
+
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: result.error || 'API call failed',
+          duration_ms: result.duration || duration,
+          url: `${baseUrl}${cleanEndpoint}`,
+          method,
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
 
   } catch (error) {
     console.error('[FDT Explorer] Error:', error);

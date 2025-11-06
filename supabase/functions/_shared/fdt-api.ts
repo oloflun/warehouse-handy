@@ -1,13 +1,13 @@
 interface FDTApiOptions {
   endpoint: string;
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
-  body?: any;
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  body?: unknown;
 }
 
 async function tryFetchWithAuthStrategy(
   url: string,
   method: string,
-  body: any,
+  body: unknown,
   authHeader: { [key: string]: string }
 ): Promise<Response> {
   return await fetch(url, {
@@ -33,7 +33,7 @@ export async function callFDTApi({ endpoint, method = 'GET', body }: FDTApiOptio
   const fullUrl = `${baseUrl}${endpoint}`;
   
   console.log(`🌐 FDT API ${method} ${fullUrl}`);
-  if (body && (method === 'POST' || method === 'PUT')) {
+  if (body && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
     console.log('📤 Request body:', JSON.stringify(body, null, 2));
   }
   
@@ -54,7 +54,6 @@ export async function callFDTApi({ endpoint, method = 'GET', body }: FDTApiOptio
   ];
   
   let lastResponse: Response | null = null;
-  let lastError: Error | null = null;
   let wwwAuthenticate: string | null = null;
   const triedStrategies: string[] = [];
   
@@ -181,14 +180,31 @@ export async function callFDTApi({ endpoint, method = 'GET', body }: FDTApiOptio
   }
 }
 
-export async function logSync(supabase: any, logData: {
+// Define a minimal interface for the Supabase client operations we use
+interface SupabaseClient {
+  from: (table: string) => {
+    insert: (data: {
+      sync_type: string;
+      direction: string;
+      fdt_article_id?: string;
+      wms_product_id?: string;
+      status: string;
+      request_payload?: unknown;
+      response_payload?: unknown;
+      error_message?: string;
+      duration_ms: number;
+    }) => Promise<unknown>;
+  };
+}
+
+export async function logSync(supabase: SupabaseClient, logData: {
   sync_type: string;
   direction: string;
   fdt_article_id?: string;
   wms_product_id?: string;
   status: string;
-  request_payload?: any;
-  response_payload?: any;
+  request_payload?: unknown;
+  response_payload?: unknown;
   error_message?: string;
   duration_ms: number;
 }) {
