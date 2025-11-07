@@ -72,25 +72,34 @@ Deno.serve(async (req) => {
         });
 
         if (error) {
-          console.error(`❌ Failed to resolve ${product.name}:`, error);
+          console.error(`❌ Failed to resolve ${product.name} (invoke error):`, error);
           failed++;
           failures.push({
             productId: product.id,
             productName: product.name,
             articleId: product.fdt_sellus_article_id,
-            error: error.message || 'Unknown error'
+            error: error.message || 'Unknown invoke error'
           });
         } else if (data?.success && data?.numericId) {
           console.log(`✅ Resolved ${product.name}: ${data.numericId}`);
           resolved++;
-        } else {
-          console.error(`❌ Failed to resolve ${product.name}: No numeric ID returned`);
+        } else if (data?.error) {
+          console.error(`❌ Failed to resolve ${product.name}:`, data.error);
           failed++;
           failures.push({
             productId: product.id,
             productName: product.name,
             articleId: product.fdt_sellus_article_id,
-            error: 'No numeric ID returned'
+            error: data.error
+          });
+        } else {
+          console.error(`❌ Failed to resolve ${product.name}: Unexpected response`, data);
+          failed++;
+          failures.push({
+            productId: product.id,
+            productName: product.name,
+            articleId: product.fdt_sellus_article_id,
+            error: 'Unexpected response from auto-resolve'
           });
         }
       } catch (error) {
