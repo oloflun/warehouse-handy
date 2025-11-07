@@ -1,5 +1,3 @@
-# My Agent
-
 name: "Warehouse Manager"
 description: "Custom agent for warehouse-handy WMS project"
 owner: "oloflun"
