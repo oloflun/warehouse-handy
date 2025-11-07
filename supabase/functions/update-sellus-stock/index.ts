@@ -6,6 +6,30 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface StockUpdateErrorResponse {
+  success: false;
+  error: string;
+  details?: string;
+  articleId?: string;
+  numericId?: string;
+  branchId?: string;
+  productName?: string;
+}
+
+interface StockUpdateSuccessResponse {
+  success: boolean;
+  message: string;
+  product: string;
+  oldStock: number;
+  newStock: number;
+  observedStock: number;
+  verified: boolean;
+  numericId: string;
+  articleId: string;
+  branchId: string;
+  usedBranchFallback: boolean;
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -120,14 +144,16 @@ Deno.serve(async (req) => {
           duration_ms: duration,
         });
 
+        const errorResponse: StockUpdateErrorResponse = {
+          success: false, 
+          error: `Cannot sync: No numeric ID for article ${product.fdt_sellus_article_id}`,
+          details: 'Run batch-resolve-all-ids edge function or manually set fdt_sellus_item_numeric_id',
+          articleId: product.fdt_sellus_article_id,
+          productName: product.name
+        };
+        
         return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: `Cannot sync: No numeric ID for article ${product.fdt_sellus_article_id}`,
-            details: 'Run batch-resolve-all-ids edge function or manually set fdt_sellus_item_numeric_id',
-            articleId: product.fdt_sellus_article_id,
-            productName: product.name
-          }),
+          JSON.stringify(errorResponse),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -176,12 +202,17 @@ Deno.serve(async (req) => {
         duration_ms: duration,
       });
 
+      const errorResponse: StockUpdateErrorResponse = {
+        success: false, 
+        error: errorMsg,
+        details: getItemResponse.error,
+        articleId: product.fdt_sellus_article_id,
+        numericId,
+        branchId
+      };
+      
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: errorMsg,
-          details: getItemResponse.error
-        }),
+        JSON.stringify(errorResponse),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -192,7 +223,8 @@ Deno.serve(async (req) => {
     console.log(`📊 Old stock in Sellus: ${oldStock}, New stock to set: ${totalStock}`);
     
     // Step 4: Create minimal stock update payload
-    // Note: We try multiple field names because different FDT API versions may use different field names
+    // We send multiple field names (stock, quantity, availableQuantity) to ensure 
+    // compatibility - the FDT API may accept any of these depending on configuration
     const updatePayload = {
       stock: totalStock,
       quantity: totalStock,
@@ -267,20 +299,22 @@ Deno.serve(async (req) => {
         duration_ms: duration,
       });
 
+      const response: StockUpdateSuccessResponse = {
+        success: verificationStatus === 'success',
+        message: verificationMessage,
+        product: product.name,
+        oldStock,
+        newStock: totalStock,
+        observedStock,
+        verified: observedStock === totalStock,
+        numericId,
+        articleId: product.fdt_sellus_article_id,
+        branchId,
+        usedBranchFallback
+      };
+      
       return new Response(
-        JSON.stringify({
-          success: verificationStatus === 'success',
-          message: verificationMessage,
-          product: product.name,
-          oldStock,
-          newStock: totalStock,
-          observedStock,
-          verified: observedStock === totalStock,
-          numericId,
-          articleId: product.fdt_sellus_article_id,
-          branchId,
-          usedBranchFallback
-        }),
+        JSON.stringify(response),
         { status: verificationStatus === 'success' ? 200 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } else {
@@ -297,15 +331,17 @@ Deno.serve(async (req) => {
         duration_ms: duration,
       });
 
+      const errorResponse: StockUpdateErrorResponse = {
+        success: false, 
+        error: 'Failed to update stock in Sellus',
+        details: updateResponse.error,
+        articleId: product.fdt_sellus_article_id,
+        numericId,
+        branchId
+      };
+      
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Failed to update stock in Sellus',
-          details: updateResponse.error,
-          articleId: product.fdt_sellus_article_id,
-          numericId,
-          branchId
-        }),
+        JSON.stringify(errorResponse),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
