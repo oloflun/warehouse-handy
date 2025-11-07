@@ -305,7 +305,7 @@ Deno.serve(async (req) => {
           
           return new Response(
             JSON.stringify(errorResponse),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
       } else {
