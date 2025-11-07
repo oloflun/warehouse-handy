@@ -2,29 +2,6 @@
 
 This document covers fixes for configuration checking and sync function error handling in the FDT Sellus integration.
 
-## Latest Update: Simplified Authentication
-
-### Change
-The FDT API authentication has been simplified to use the Sellus API Key directly as the `Authorization` header value, instead of trying multiple authentication strategies.
-
-### Benefits
-1. **Faster API calls**: No need to try multiple auth strategies
-2. **Clearer error messages**: Authentication failures are immediately clear
-3. **Simpler code**: Removed complex auth strategy logic
-4. **More reliable**: Direct approach eliminates auth strategy guessing
-
-### Implementation
-The API key is now sent directly:
-```typescript
-headers: {
-  'Authorization': apiKey,  // Direct API key value
-  'Content-Type': 'application/json',
-  'Accept': 'application/json',
-}
-```
-
----
-
 ## Issue 1: Configuration Error in FDT API Explorer
 
 ### Problem

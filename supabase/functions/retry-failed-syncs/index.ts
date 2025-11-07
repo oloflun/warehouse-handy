@@ -62,11 +62,9 @@ Deno.serve(async (req) => {
           });
 
           if (resolveResponse.error) {
-            console.error(`⚠️ Failed to auto-resolve ID (invoke error):`, resolveResponse.error);
-          } else if (resolveResponse.data?.success && resolveResponse.data?.numericId) {
+            console.error(`⚠️ Failed to auto-resolve ID:`, resolveResponse.error);
+          } else if (resolveResponse.data?.numericId) {
             console.log(`✅ Auto-resolved numeric ID: ${resolveResponse.data.numericId}`);
-          } else if (resolveResponse.data?.error) {
-            console.error(`⚠️ Failed to auto-resolve ID:`, resolveResponse.data.error);
           }
         }
 
