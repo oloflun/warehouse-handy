@@ -1,3 +1,4 @@
+---
 name: "Warehouse Manager"
 description: "Custom agent for warehouse-handy WMS project"
 owner: "oloflun"
@@ -154,3 +155,4 @@ rules:
   - "Use Swedish for all UI text"
   - "Verify mobile responsiveness"
   - "Create comprehensive documentation for all features"
+---
