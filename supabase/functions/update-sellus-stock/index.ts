@@ -93,10 +93,14 @@ Deno.serve(async (req) => {
       });
 
       if (resolveResponse.error) {
-        console.error('❌ Auto-resolve failed:', resolveResponse.error);
-      } else if (resolveResponse.data?.numericId) {
+        console.error('❌ Auto-resolve failed with invoke error:', resolveResponse.error);
+      } else if (resolveResponse.data?.success && resolveResponse.data?.numericId) {
         numericId = String(resolveResponse.data.numericId);
         console.log(`✅ Auto-resolve SUCCESS: Numeric ID = ${numericId}`);
+      } else if (resolveResponse.data?.error) {
+        console.error('❌ Auto-resolve failed with error:', resolveResponse.data.error);
+      } else {
+        console.error('❌ Auto-resolve returned unexpected response:', resolveResponse.data);
       }
       
       // If STILL no numeric ID, fail the sync
@@ -187,16 +191,15 @@ Deno.serve(async (req) => {
     const oldStock = existingItem.stock || existingItem.quantity || existingItem.availableQuantity || 0;
     console.log(`📊 Old stock in Sellus: ${oldStock}, New stock to set: ${totalStock}`);
     
-    // Step 4: Create minimal, branch-specific update payload
+    // Step 4: Create minimal stock update payload
+    // Note: We try multiple field names because different FDT API versions may use different field names
     const updatePayload = {
-      id: Number(numericId),
-      branchId: Number(branchId),
       stock: totalStock,
       quantity: totalStock,
       availableQuantity: totalStock,
     };
 
-    console.log(`📤 Updating Sellus item ${numericId} (article: ${product.fdt_sellus_article_id}) with branch-specific payload`);
+    console.log(`📤 Updating Sellus item ${numericId} (article: ${product.fdt_sellus_article_id}) with payload:`, updatePayload);
 
     // Try POST first with branch-specific endpoint, fallback to PUT if needed
     let updateResponse = await callFDTApi({
@@ -298,7 +301,10 @@ Deno.serve(async (req) => {
         JSON.stringify({ 
           success: false, 
           error: 'Failed to update stock in Sellus',
-          details: updateResponse.error 
+          details: updateResponse.error,
+          articleId: product.fdt_sellus_article_id,
+          numericId,
+          branchId
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
