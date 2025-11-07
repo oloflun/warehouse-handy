@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
       console.warn('⚠️ No products found with FDT Sellus article IDs');
       return new Response(
         JSON.stringify({
-          success: false,
+          success: true,  // Changed: This is not an error, just no work to do
           synced: 0,
           skipped: 0,
           errors: 0,
@@ -64,8 +64,11 @@ Deno.serve(async (req) => {
         );
 
         if (invokeError) {
-          throw new Error(invokeError.message);
+          console.error(`❌ Invoke error for ${product.name}:`, invokeError);
+          throw new Error(invokeError.message || 'Failed to invoke update-sellus-stock');
         }
+
+        console.log(`📊 Result for ${product.name}:`, JSON.stringify(result, null, 2));
 
         if (result?.success) {
           if (result.skipped) {
@@ -99,7 +102,12 @@ Deno.serve(async (req) => {
       .eq('sync_type', 'inventory_export');
 
     const branchId = Deno.env.get('FDT_SELLUS_BRANCH_ID') || 'not configured';
-    console.log(`✅ Inventory sync completed (branch: ${branchId}): ${syncedCount} synced, ${skippedCount} skipped, ${errorCount} errors`);
+    const totalProcessed = syncedCount + skippedCount + errorCount;
+    console.log(`✅ Inventory sync completed (branch: ${branchId})`);
+    console.log(`   📊 Total products processed: ${totalProcessed}`);
+    console.log(`   ✅ Successfully synced: ${syncedCount}`);
+    console.log(`   ⏭️  Skipped: ${skippedCount}`);
+    console.log(`   ❌ Errors: ${errorCount}`);
 
     return new Response(
       JSON.stringify({
@@ -107,8 +115,9 @@ Deno.serve(async (req) => {
         synced: syncedCount,
         skipped: skippedCount,
         errors: errorCount,
-        errorDetails: errors,
+        errorDetails: errors.length > 0 ? errors : undefined,
         branchId: branchId,
+        totalProcessed: totalProcessed,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
