@@ -1,0 +1,76 @@
+name: Deploy Supabase Functions
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - functions/**
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v35
+        with:
+          files: functions/**
+
+      - name: Store changed files
+        run: echo "CHANGED_FILES=${{steps.changed-files.outputs.all_changed_files}}" >> $GITHUB_ENV
+
+      - name: Get impacted functions
+        id: impacted_functions
+        run: |
+          impactedFunctions=()
+          checkedFiles=()
+          filesToCheck=($CHANGED_FILES)
+          while [ ${#filesToCheck[@]} -gt 0 ]; do
+            file=${filesToCheck[0]}
+            unset filesToCheck[0]
+            filesToCheck=(${filesToCheck[*]})
+
+            if [[ "${checkedFiles[*]}" == *"$file"* ]]; then
+              continue
+            fi
+
+            checkedFiles+=("$file")
+
+            folder=$(dirname "$file")
+            folder_name=$(basename "$folder")
+            file_name=$(basename "$file")
+
+            if [ "$folder_name" == "_shared" ]; then
+              if output=$(grep -r -l "import .* from .*/${file_name}" . --only-matching 2>/dev/null); then
+                while read -r line; do
+                  filesToCheck+=("$line")
+                done <<< "$output"
+              fi
+            else
+              impactedFunctions+=("$folder_name")
+            fi
+          done
+
+          impactedFunctions=$(echo "${impactedFunctions[@]}" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+          echo "IMPACTED_FUNCTIONS=$impactedFunctions" >> $GITHUB_ENV
+
+      - name: Deploy Functions
+        run: |
+          for function in $IMPACTED_FUNCTIONS; do
+            supabase functions deploy $function --project-ref $PROJECT_ID
+          done
