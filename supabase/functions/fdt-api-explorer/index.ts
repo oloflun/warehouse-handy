@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
   const startTime = Date.now();
   
   try {
-    // Parse request body first before any other checks
+    // Parse request body early to ensure it's valid before processing
     const { endpoint, method = 'GET', body, verifyConfigOnly = false }: ExplorerRequest = await req.json();
     
     console.log(`[FDT Explorer] Testing endpoint: ${method} ${endpoint}, verifyConfigOnly: ${verifyConfigOnly}`);

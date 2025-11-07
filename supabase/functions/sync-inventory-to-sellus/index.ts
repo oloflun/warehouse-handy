@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
       console.warn('⚠️ No products found with FDT Sellus article IDs');
       return new Response(
         JSON.stringify({
-          success: true,  // Changed: This is not an error, just no work to do
+          success: true,  // Not an error - no products to sync
           synced: 0,
           skipped: 0,
           errors: 0,
@@ -65,7 +65,8 @@ Deno.serve(async (req) => {
 
         if (invokeError) {
           console.error(`❌ Invoke error for ${product.name}:`, invokeError);
-          throw new Error(invokeError.message || 'Failed to invoke update-sellus-stock');
+          const errorMsg = invokeError.message || `Failed to invoke update-sellus-stock for ${product.name}`;
+          throw new Error(errorMsg);
         }
 
         console.log(`📊 Result for ${product.name}:`, JSON.stringify(result, null, 2));
