@@ -17,7 +17,7 @@ interface StockUpdateErrorResponse {
 }
 
 interface StockUpdateSuccessResponse {
-  success: boolean;
+  success: true;
   message: string;
   product: string;
   oldStock: number;
@@ -223,8 +223,8 @@ Deno.serve(async (req) => {
     console.log(`📊 Old stock in Sellus: ${oldStock}, New stock to set: ${totalStock}`);
     
     // Step 4: Create minimal stock update payload
-    // We send multiple field names (stock, quantity, availableQuantity) to ensure 
-    // compatibility - the FDT API may accept any of these depending on configuration
+    // Send multiple field names as the FDT API may accept different field names 
+    // depending on configuration. This duplication is intentional for API compatibility.
     const updatePayload = {
       stock: totalStock,
       quantity: totalStock,
@@ -261,7 +261,6 @@ Deno.serve(async (req) => {
       });
 
       let observedStock = totalStock; // Default to what we tried to set
-      let verificationStatus = 'success';
       let verificationMessage = '';
 
       if (verifyResponse.success && verifyResponse.data) {
@@ -272,8 +271,42 @@ Deno.serve(async (req) => {
           verificationMessage = `Stock changed from ${oldStock} to ${totalStock} for branch ${branchId}`;
         } else {
           console.error(`⚠️ Stock mismatch! Expected: ${totalStock}, Observed: ${observedStock}`);
-          verificationStatus = 'error';
           verificationMessage = `Branch stock did not change correctly. Expected: ${totalStock}, Observed: ${observedStock}`;
+          
+          // Log as error
+          await logSync(supabaseClient, {
+            sync_type: 'inventory_item',
+            direction: 'wms_to_fdt',
+            fdt_article_id: product.fdt_sellus_article_id,
+            wms_product_id: productId,
+            status: 'error',
+            request_payload: { 
+              stock: totalStock, 
+              numericId, 
+              articleId: product.fdt_sellus_article_id, 
+              branchId, 
+              usedBranchFallback,
+              strategy: 'items?id&branchId'
+            },
+            response_payload: updateResponse.data,
+            error_message: verificationMessage,
+            duration_ms: duration,
+          });
+          
+          const errorResponse: StockUpdateErrorResponse = {
+            success: false,
+            error: verificationMessage,
+            details: `Stock update sent but verification shows mismatch`,
+            articleId: product.fdt_sellus_article_id,
+            numericId,
+            branchId,
+            productName: product.name
+          };
+          
+          return new Response(
+            JSON.stringify(errorResponse),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
         }
       } else {
         console.warn(`⚠️ Could not verify stock update: ${verifyResponse.error}`);
@@ -285,7 +318,7 @@ Deno.serve(async (req) => {
         direction: 'wms_to_fdt',
         fdt_article_id: product.fdt_sellus_article_id,
         wms_product_id: productId,
-        status: verificationStatus,
+        status: 'success',
         request_payload: { 
           stock: totalStock, 
           numericId, 
@@ -295,12 +328,11 @@ Deno.serve(async (req) => {
           strategy: 'items?id&branchId'
         },
         response_payload: updateResponse.data,
-        error_message: verificationStatus === 'error' ? verificationMessage : undefined,
         duration_ms: duration,
       });
 
       const response: StockUpdateSuccessResponse = {
-        success: verificationStatus === 'success',
+        success: true,
         message: verificationMessage,
         product: product.name,
         oldStock,
@@ -315,7 +347,7 @@ Deno.serve(async (req) => {
       
       return new Response(
         JSON.stringify(response),
-        { status: verificationStatus === 'success' ? 200 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } else {
       console.error('Failed to update stock in Sellus:', updateResponse.error);
