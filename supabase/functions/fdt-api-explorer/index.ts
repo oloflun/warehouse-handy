@@ -18,15 +18,6 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Verify JWT token
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader) {
-    return new Response(
-      JSON.stringify({ success: false, error: 'Unauthorized - missing authorization header' }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-
   const startTime = Date.now();
   
   try {
