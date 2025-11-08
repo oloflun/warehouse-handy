@@ -14,7 +14,7 @@ jobs:
 
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      PROJECT_ID: your-project-id-here  # ← CHANGE THIS!
 
     steps:
       - name: Checkout Code
@@ -25,52 +25,12 @@ jobs:
         with:
           version: latest
 
-      - name: Get changed files
-        id: changed-files
-        uses: tj-actions/changed-files@v35
-        with:
-          files: functions/**
-
-      - name: Store changed files
-        run: echo "CHANGED_FILES=${{steps.changed-files.outputs.all_changed_files}}" >> $GITHUB_ENV
-
-      - name: Get impacted functions
-        id: impacted_functions
+      - name: Deploy All Functions
         run: |
-          impactedFunctions=()
-          checkedFiles=()
-          filesToCheck=($CHANGED_FILES)
-          while [ ${#filesToCheck[@]} -gt 0 ]; do
-            file=${filesToCheck[0]}
-            unset filesToCheck[0]
-            filesToCheck=(${filesToCheck[*]})
-
-            if [[ "${checkedFiles[*]}" == *"$file"* ]]; then
-              continue
+          for dir in functions/*/; do
+            if [ -d "$dir" ]; then
+              function_name=$(basename "$dir")
+              echo "Deploying $function_name..."
+              supabase functions deploy "$function_name" --project-ref $PROJECT_ID
             fi
-
-            checkedFiles+=("$file")
-
-            folder=$(dirname "$file")
-            folder_name=$(basename "$folder")
-            file_name=$(basename "$file")
-
-            if [ "$folder_name" == "_shared" ]; then
-              if output=$(grep -r -l "import .* from .*/${file_name}" . --only-matching 2>/dev/null); then
-                while read -r line; do
-                  filesToCheck+=("$line")
-                done <<< "$output"
-              fi
-            else
-              impactedFunctions+=("$folder_name")
-            fi
-          done
-
-          impactedFunctions=$(echo "${impactedFunctions[@]}" | tr ' ' '\n' | sort -u | tr '\n' ' ')
-          echo "IMPACTED_FUNCTIONS=$impactedFunctions" >> $GITHUB_ENV
-
-      - name: Deploy Functions
-        run: |
-          for function in $IMPACTED_FUNCTIONS; do
-            supabase functions deploy $function --project-ref $PROJECT_ID
           done
