@@ -5,7 +5,7 @@ This document covers fixes for configuration checking and sync function error ha
 ## Latest Update: Simplified Authentication
 
 ### Change
-The FDT API authentication has been simplified to use the Sellus API Key directly as the `Authorization` header value, instead of trying multiple authentication strategies.
+The FDT API authentication has been simplified to use Bearer token format with the Sellus API Key in the `Authorization` header, instead of trying multiple authentication strategies.
 
 ### Benefits
 1. **Faster API calls**: No need to try multiple auth strategies
@@ -14,10 +14,10 @@ The FDT API authentication has been simplified to use the Sellus API Key directl
 4. **More reliable**: Direct approach eliminates auth strategy guessing
 
 ### Implementation
-The API key is now sent directly:
+The API key is now sent with Bearer token format:
 ```typescript
 headers: {
-  'Authorization': apiKey,  // Direct API key value
+  'Authorization': `Bearer ${apiKey}`,  // Bearer token format
   'Content-Type': 'application/json',
   'Accept': 'application/json',
 }

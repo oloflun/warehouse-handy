@@ -18,10 +18,10 @@ FDT sync was not working properly due to authentication issues and inconsistent 
 - Also tested query parameter authentication
 - Slow and confusing error messages
 
-**After**: Direct authentication using Sellus API Key
+**After**: Bearer token authentication using Sellus API Key
 ```typescript
 headers: {
-  'Authorization': apiKey,  // Direct API key value
+  'Authorization': `Bearer ${apiKey}`,  // Bearer token format
   'Content-Type': 'application/json',
   'Accept': 'application/json',
 }
@@ -190,4 +190,4 @@ Before deploying to production:
 
 No database migrations required. Changes are backward compatible.
 
-The new authentication method requires that `FDT_SELLUS_API_KEY` contains the raw API key value (not Bearer token format).
+The authentication method uses Bearer token format. `FDT_SELLUS_API_KEY` should contain the raw API key value (without "Bearer" prefix), as the Bearer prefix is automatically added by the code.
