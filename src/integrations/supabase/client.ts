@@ -38,4 +38,11 @@ if (!isSupabaseConfigured) {
     SUPABASE_URL: SUPABASE_URL ? 'SET' : 'NOT_SET',
     SUPABASE_KEY: SUPABASE_PUBLISHABLE_KEY ? 'SET' : 'NOT_SET',
   });
+} else {
+  try {
+    const host = new URL(SUPABASE_URL).host;
+    console.info('[Supabase] Using SUPABASE_URL host:', host);
+  } catch (e) {
+    console.info('[Supabase] SUPABASE_URL is set but could not parse host');
+  }
 }
