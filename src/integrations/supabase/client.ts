@@ -2,15 +2,29 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+// Support multiple environment variable names to avoid "NetworkError when attempting to fetch resource"
+// in environments where VITE_ prefixed vars are not set. Prefer VITE_* when available (Vite),
+// otherwise fall back to common names used in Supabase functions or plain envs.
+const SUPABASE_URL =
+  (import.meta as any).env?.VITE_SUPABASE_URL ||
+  (import.meta as any).env?.SUPABASE_URL ||
+  // @ts-ignore - process may not exist in the browser, but helps in some environments
+  (typeof process !== 'undefined' ? (process.env as any).SUPABASE_URL : undefined) ||
+  '';
+
+const SUPABASE_PUBLISHABLE_KEY =
+  (import.meta as any).env?.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  (import.meta as any).env?.SUPABASE_ANON_KEY ||
+  (import.meta as any).env?.SUPABASE_PUBLISHABLE_KEY ||
+  (typeof process !== 'undefined' ? (process.env as any).SUPABASE_ANON_KEY || (process.env as any).SUPABASE_PUBLISHABLE_KEY : undefined) ||
+  '';
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
-    storage: localStorage,
+    storage: typeof window !== 'undefined' ? localStorage : undefined,
     persistSession: true,
     autoRefreshToken: true,
   }
