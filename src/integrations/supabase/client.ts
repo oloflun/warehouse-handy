@@ -29,3 +29,13 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     autoRefreshToken: true,
   }
 });
+
+export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY);
+
+if (!isSupabaseConfigured) {
+  // Helpful console message for local debugging - do not expose secrets
+  console.error('[Supabase] Missing SUPABASE_URL or SUPABASE_PUBLISHABLE_KEY/SUPABASE_ANON_KEY.\n', {
+    SUPABASE_URL: SUPABASE_URL ? 'SET' : 'NOT_SET',
+    SUPABASE_KEY: SUPABASE_PUBLISHABLE_KEY ? 'SET' : 'NOT_SET',
+  });
+}
