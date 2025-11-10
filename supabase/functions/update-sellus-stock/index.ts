@@ -213,42 +213,31 @@ Deno.serve(async (req) => {
     const oldStock = existingItem.stock || existingItem.quantity || existingItem.availableQuantity || 0;
     console.log(`📊 Old stock in Sellus: ${oldStock}, New stock to set: ${totalStock}`);
     
-    // Step 4: Create stock update payload
-    // Based on standard REST API conventions, we send the item data for update
-    // Include the existing item data plus the updated stock to ensure we don't lose any fields
+    // Step 4: Create minimal stock update payload
+    // Send multiple field names as the FDT API may accept different field names 
+    // depending on configuration. This duplication is intentional for API compatibility.
     const updatePayload = {
-      ...existingItem,  // Preserve all existing fields from the GET response
-      stock: totalStock,  // Update stock field
-      quantity: totalStock,  // Update quantity field (alternative name)
-      availableQuantity: totalStock,  // Update available quantity
+      stock: totalStock,
+      quantity: totalStock,
+      availableQuantity: totalStock,
     };
 
-    console.log(`📤 Updating Sellus item ${numericId} (article: ${product.fdt_sellus_article_id})`);
-    console.log(`   Old stock: ${oldStock}, New stock: ${totalStock}`);
+    console.log(`📤 Updating Sellus item ${numericId} (article: ${product.fdt_sellus_article_id}) with payload:`, updatePayload);
 
-    // Use PUT for updating existing items (REST standard)
-    // PUT replaces the entire resource, which is why we include all existing fields
+    // Try POST first with branch-specific endpoint, fallback to PUT if needed
     let updateResponse = await callFDTApi({
       endpoint: `/items/${numericId}?branchId=${branchId}`,
-      method: 'PUT',
+      method: 'POST',
       body: updatePayload,
     });
 
-    // If PUT fails with method error, try PATCH as fallback
+    // If POST fails with method error, try PUT
     if (!updateResponse.success && (updateResponse.error?.includes('405') || updateResponse.error?.includes('Method'))) {
-      console.log(`⚠️ PUT failed, trying PATCH method`);
-      
-      // PATCH only sends the fields we want to update
-      const patchPayload = {
-        stock: totalStock,
-        quantity: totalStock,
-        availableQuantity: totalStock,
-      };
-      
+      console.log(`⚠️ POST failed, trying PUT method`);
       updateResponse = await callFDTApi({
         endpoint: `/items/${numericId}?branchId=${branchId}`,
-        method: 'PATCH',
-        body: patchPayload,
+        method: 'PUT',
+        body: updatePayload,
       });
     }
 

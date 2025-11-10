@@ -33,21 +33,18 @@ export async function callFDTApi({ endpoint, method = 'GET', body }: FDTApiOptio
   console.log(`🔐 Using Authorization: Bearer {api-key}`);
   
   try {
-    // Build headers - only include Content-Type for methods that have a body
-    const headers: Record<string, string> = {
-      'Authorization': `Bearer ${apiKey}`,
-      'Accept': 'application/json',
-    };
-    
-    // Build fetch options
+    // Build fetch options - only include body for methods that support it
     const fetchOptions: RequestInit = {
       method,
-      headers,
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
     };
     
-    // Only add body and Content-Type for methods that support request bodies
+    // Only add body for methods that support request bodies
     if (body && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
-      headers['Content-Type'] = 'application/json';
       fetchOptions.body = JSON.stringify(body);
     }
     

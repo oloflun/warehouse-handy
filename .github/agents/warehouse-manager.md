@@ -29,9 +29,11 @@ instructions: |
   
   ### 3. Environment Configuration
   Always remind user these Supabase environment variables must be configured:
-  - FDT_SELLUS_BASE_URL
-  - FDT_SELLUS_API_KEY
+  - FDT_SELLUS_BASE_URL (MUST include https:// prefix - critical!)
+  - FDT_SELLUS_API_KEY (raw key value only, NOT including "Bearer ")
   - FDT_SELLUS_BRANCH_ID (optional, defaults to 5)
+  
+  **CRITICAL**: Missing `https://` in base URL will break all API calls!
   
   ### 4. No AI References in UI
   - Remove ALL "AI" mentions from user-facing text
@@ -128,6 +130,7 @@ instructions: |
   
   - Authentication: JWT tokens in Authorization headers
   - API Integration: FDT Sellus API with branch ID (default: 5)
+  - **FDT API HTTP Methods**: Use POST for updating data (orders, articles, inventory), not PUT/PATCH. PUT is for system settings.
   - Logging: All sync operations with direction (wms_to_fdt), status, duration
   - Error Messages: User-friendly Swedish translations
   - Mobile UX: Optimize for delivery note scanning on phones
@@ -155,4 +158,7 @@ rules:
   - "Use Swedish for all UI text"
   - "Verify mobile responsiveness"
   - "Create comprehensive documentation for all features"
+  - "FDT Sellus API uses POST for data updates, not PUT - verify with Swagger UI"
+  - "Base URL must include https:// protocol - missing it breaks all API calls"
+  - "Update this agent config with important findings when PRs are merged"
 ---

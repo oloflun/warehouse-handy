@@ -72,6 +72,8 @@ Your Swagger URL is: `https://stagesellus.fdt.se/12345/api/swagger/index.html`
 
 **This is your base URL** - set it exactly like this in Supabase.
 
+⚠️ **CRITICAL**: The `https://` prefix is absolutely required! Setting the base URL without it (e.g., `stagesellus.fdt.se/12345/api`) will break all API functions.
+
 Replace `12345` with your actual tenant/store ID if different.
 
 #### Step 4: Test with curl (5 minutes)
@@ -127,6 +129,7 @@ Based on curl test results:
 ### 🎯 Most Likely Issues (Pick One)
 
 #### Issue A: Base URL Has Wrong Format (60% probability)
+
 **Check**: Does your base URL in Supabase exactly match the Swagger URL format?
 
 **Fix**:
@@ -134,6 +137,8 @@ Based on curl test results:
 # Set in Supabase environment variables:
 FDT_SELLUS_BASE_URL=https://stagesellus.fdt.se/[YOUR_ID]/api
 ```
+
+⚠️ **CRITICAL**: The `https://` protocol prefix is mandatory! Without it, all API calls will fail. Common mistake: Setting it as `stagesellus.fdt.se/12345/api` (missing `https://`).
 
 #### Issue B: API Key is Wrong (30% probability)
 **Check**: Is your API key correct? Has it expired?
