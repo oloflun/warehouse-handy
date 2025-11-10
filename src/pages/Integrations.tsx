@@ -386,6 +386,19 @@ const Integrations = () => {
       ) : (
         /* Mobil: Original 4-korts grid */
         <div className="grid gap-6 grid-cols-1">
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/scanner')}>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-blue-500/10">
+                    <QrCode className="h-6 w-6 text-blue-500" />
+                  </div>
+                  <CardTitle className="text-xl">Scanna</CardTitle>
+                </div>
+                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+              </div>
+            </CardHeader>
+          </Card>
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader onClick={() => navigate('/inventory')} className="cursor-pointer rounded-none">
               <div className="flex items-center justify-between">
