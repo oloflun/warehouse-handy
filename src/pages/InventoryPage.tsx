@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -40,6 +40,17 @@ const InventoryPage = () => {
   }, []);
 
   const fetchInventory = async () => {
+    if (!isSupabaseConfigured) {
+      console.error('Supabase is not configured. SUPABASE_URL or key missing.');
+      toast({
+        title: "Fel",
+        description: "Supabase är inte konfigurerad. Sätt VITE_SUPABASE_URL/SUPABASE_URL och VITE_SUPABASE_PUBLISHABLE_KEY/SUPABASE_ANON_KEY.",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('inventory')
@@ -69,11 +80,21 @@ const InventoryPage = () => {
       );
 
       setInventory(inventoryWithOrders);
-    } catch (error) {
-      console.error('Error fetching inventory:', error);
+    } catch (err) {
+      // Prefer using the error message when available, otherwise try to stringify
+      let message = 'Kunde inte hämta lagersaldo';
+      try {
+        if (err && (err as any).message) message = (err as any).message;
+        else if (typeof err === 'string') message = err;
+        else message = JSON.stringify(err);
+      } catch (e) {
+        // ignore stringify errors
+      }
+
+      console.error('Error fetching inventory:', err);
       toast({
         title: "Fel",
-        description: "Kunde inte hämta lagersaldo",
+        description: message,
         variant: "destructive",
       });
     } finally {

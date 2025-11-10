@@ -1038,9 +1038,11 @@ const Scanner = () => {
           )}
           
           <div id="reader" className="w-full"></div>
-          
-          {cameraStarted && (
-            <div className="space-y-3">
+
+          {/* Manual search always visible */}
+          <div className="space-y-3">
+            {/* Camera capture button - only when camera started */}
+            {cameraStarted && (
               <Button
                 onClick={captureImage}
                 disabled={isAnalyzing}
@@ -1059,28 +1061,31 @@ const Scanner = () => {
                   </>
                 )}
               </Button>
-              
-              <div className="flex gap-2 items-end">
-                <div className="flex-1">
-                  <Label htmlFor="manualCode" className="text-sm">Eller ange artikelnummer</Label>
-                  <Input
-                    id="manualCode"
-                    placeholder="Artikelnummer"
-                    value={manualCode}
-                    onChange={(e) => setManualCode(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleManualSearch()}
-                    disabled={isAnalyzing}
-                  />
-                </div>
-                <Button 
-                  onClick={handleManualSearch}
-                  disabled={isAnalyzing || !manualCode.trim()}
-                  size="default"
-                >
-                  Sök
-                </Button>
+            )}
+
+            <div className="flex gap-2 items-end">
+              <div className="flex-1">
+                <Label htmlFor="manualCode" className="text-sm">Eller ange artikelnummer</Label>
+                <Input
+                  id="manualCode"
+                  placeholder="Artikelnummer"
+                  value={manualCode}
+                  onChange={(e) => setManualCode(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleManualSearch()}
+                  disabled={isAnalyzing}
+                />
               </div>
-              
+              <Button
+                onClick={handleManualSearch}
+                disabled={isAnalyzing || !manualCode.trim()}
+                size="default"
+              >
+                Sök
+              </Button>
+            </div>
+
+            {/* Stop camera button when running */}
+            {cameraStarted && (
               <Button
                 onClick={stopScanning}
                 variant="outline"
@@ -1089,8 +1094,8 @@ const Scanner = () => {
               >
                 Stoppa kamera
               </Button>
-            </div>
-          )}
+            )}
+          </div>
             
             {/* Barcode mode (hidden by default) */}
             {scanMode === "barcode" && cameraStarted && (
