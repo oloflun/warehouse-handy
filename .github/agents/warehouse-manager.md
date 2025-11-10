@@ -1,5 +1,5 @@
 ---
-name: "Warehouse Manager"
+name: "Functions Agent"
 description: "Custom agent for warehouse-handy WMS project"
 owner: "oloflun"
 repository: "oloflun/warehouse-handy"
