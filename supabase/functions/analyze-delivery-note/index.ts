@@ -28,8 +28,6 @@ serve(async (req) => {
 
     const systemPrompt = `You are an expert delivery note (följesedel) analyzer for Swedish warehouse operations. Extract structured data with EXTREME ACCURACY.
 
-    const systemPrompt = `You are an expert delivery note (följesedel) analyzer for Swedish warehouse operations. Extract structured data with EXTREME ACCURACY.
-
 CRITICAL INSTRUCTIONS:
 
 1. **Delivery Note Number**: Extract the exact följesedelsnummer (usually at the top right, labeled "Följesedel")
