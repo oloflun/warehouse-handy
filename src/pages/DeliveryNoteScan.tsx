@@ -98,6 +98,21 @@ export default function DeliveryNoteScan() {
       setCameraLoading(true);
       setCameraActive(true);
       
+      // Lock screen orientation if supported (prevents camera exit on tilt)
+      try {
+        if (screen.orientation && 'lock' in screen.orientation) {
+          // Try to lock to current orientation
+          await (screen.orientation as any).lock('portrait').catch(() => {
+            // Fallback to natural if portrait fails
+            (screen.orientation as any).lock('natural').catch(() => {
+              console.log('Screen orientation lock not supported or denied');
+            });
+          });
+        }
+      } catch (orientationError) {
+        console.log('Orientation lock not supported:', orientationError);
+      }
+      
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { 
           facingMode: 'environment',
@@ -152,6 +167,16 @@ export default function DeliveryNoteScan() {
 
   const stopCamera = () => {
     console.log('Stopping camera');
+    
+    // Unlock screen orientation if it was locked
+    try {
+      if (screen.orientation && 'unlock' in screen.orientation) {
+        (screen.orientation as any).unlock();
+      }
+    } catch (orientationError) {
+      console.log('Orientation unlock not supported:', orientationError);
+    }
+    
     if (videoRef.current?.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
       stream.getTracks().forEach(track => {
@@ -178,13 +203,21 @@ export default function DeliveryNoteScan() {
     if (videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA) {
       toast({
         title: "Vänta",
-        description: "Kameran är inte redo ännu",
+        description: "Kameran är inte redo ännu. Vänta några sekunder och försök igen.",
         variant: "default",
       });
       return;
     }
 
     setAnalyzing(true);
+    
+    // Show what we're analyzing
+    const modeText = scanMode === 'delivery-note' ? 'följesedeln' : 'etiketten';
+    toast({
+      title: `Analyserar ${modeText}...`,
+      description: "Detta kan ta några sekunder",
+    });
+    
     try {
       const canvas = document.createElement('canvas');
       canvas.width = videoRef.current.videoWidth;
@@ -193,8 +226,11 @@ export default function DeliveryNoteScan() {
       
       if (!ctx) throw new Error('Could not get canvas context');
       
+      // Use higher quality for better OCR
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(videoRef.current, 0, 0);
-      const imageData = canvas.toDataURL('image/jpeg', 0.8);
+      const imageData = canvas.toDataURL('image/jpeg', 0.85);
 
       if (scanMode === 'delivery-note') {
         console.log('Analyzing delivery note...');
@@ -213,8 +249,8 @@ export default function DeliveryNoteScan() {
         stopCamera();
         
         toast({
-          title: "Följesedel skapad!",
-          description: `${data.items.length} ${data.items.length === 1 ? 'träff' : 'träffar'}`,
+          title: "✅ Följesedel skapad!",
+          description: `${data.items.length} ${data.items.length === 1 ? 'artikel hittades' : 'artiklar hittades'}`,
         });
       } else if (scanMode === 'article') {
         console.log('Analyzing article label...');
@@ -226,6 +262,14 @@ export default function DeliveryNoteScan() {
         if (error) throw error;
 
         console.log('Label analysis result:', data);
+        
+        // Show confidence to user
+        if (data.confidence === 'low') {
+          toast({
+            title: "⚠️ Låg läsbarhet",
+            description: "Kunde läsa etiketten men osäker på noggrannheten. Kontrollera resultatet.",
+          });
+        }
 
         // Find and check off matching article
         await checkOffArticle(data);
@@ -234,11 +278,10 @@ export default function DeliveryNoteScan() {
       }
     } catch (error) {
       console.error('Error analyzing:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Okänt fel';
       toast({
-        title: "Fel",
-        description: scanMode === 'delivery-note' 
-          ? "Kunde inte scanna följesedeln" 
-          : "Kunde inte scanna etiketten",
+        title: "❌ Kunde inte läsa " + (scanMode === 'delivery-note' ? 'följesedeln' : 'etiketten'),
+        description: `${errorMessage}. Tips: Se till att bilden är skarp och välbelyst. Försök igen.`,
         variant: "destructive",
       });
     } finally {
@@ -305,8 +348,8 @@ export default function DeliveryNoteScan() {
     
     if (articleNumbers.length === 0) {
       toast({
-        title: "Ingen artikel hittad",
-        description: "Kunde inte hitta något artikelnummer på etiketten",
+        title: "❌ Ingen artikel hittad",
+        description: "Kunde inte hitta något artikelnummer på etiketten. Ta en tydligare bild eller ange manuellt.",
         variant: "destructive",
       });
       return;
@@ -314,18 +357,24 @@ export default function DeliveryNoteScan() {
 
     // Try each article number to find a match
     let matchedItem = null;
+    let matchedArticleNumber = '';
+    
     for (const articleNumber of articleNumbers) {
       matchedItem = items.find(item => 
         !item.is_checked && 
         item.article_number.toLowerCase().includes(articleNumber.toLowerCase())
       );
-      if (matchedItem) break;
+      if (matchedItem) {
+        matchedArticleNumber = articleNumber;
+        break;
+      }
     }
 
     if (!matchedItem) {
+      const articleList = articleNumbers.join(', ');
       toast({
-        title: "Artikel ej på följesedel",
-        description: `Kunde inte hitta artikel ${articleNumbers[0]} på denna följesedel`,
+        title: "❌ Artikel ej på följesedel",
+        description: `Hittade artikelnummer: ${articleList}, men ingen av dessa finns på denna följesedel.`,
         variant: "destructive",
       });
       return;
@@ -335,8 +384,8 @@ export default function DeliveryNoteScan() {
     await handleCheckItem(matchedItem.id, true);
     
     toast({
-      title: "Artikel avcheckad!",
-      description: `${matchedItem.article_number} har checkats av`,
+      title: "✅ Artikel avcheckad!",
+      description: `${matchedItem.article_number} (${matchedItem.description || 'Ingen beskrivning'})`,
     });
   };
 
