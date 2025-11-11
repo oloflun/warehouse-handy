@@ -16,12 +16,28 @@ serve(async (req) => {
     const { imageData } = await req.json();
     
     if (!imageData) {
-      throw new Error('No image data provided');
+      return new Response(
+        JSON.stringify({ 
+          error: 'No image data provided'
+        }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
     const GOOGLE_AI_API_KEY = Deno.env.get('GOOGLE_AI_API_KEY');
     if (!GOOGLE_AI_API_KEY) {
-      throw new Error('GOOGLE_AI_API_KEY not configured. Please add it to Supabase Edge Function environment variables.');
+      return new Response(
+        JSON.stringify({ 
+          error: 'GOOGLE_AI_API_KEY not configured. Please add it to Supabase Edge Function environment variables.'
+        }),
+        { 
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
     console.log('Analyzing delivery note...');
@@ -106,14 +122,31 @@ ACCURACY IS CRITICAL. If unclear, return null for that field.`;
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Gemini API error:', response.status, errorText);
-      throw new Error(`Gemini API error: ${response.status}`);
+      return new Response(
+        JSON.stringify({ 
+          error: `Gemini API error: ${response.status}`,
+          details: errorText
+        }),
+        { 
+          status: 502,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
     const data = await response.json();
     const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!content) {
-      throw new Error('No response from Gemini API');
+      return new Response(
+        JSON.stringify({ 
+          error: 'No response from Gemini API'
+        }),
+        { 
+          status: 502,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
     // Parse the JSON response
@@ -124,12 +157,30 @@ ACCURACY IS CRITICAL. If unclear, return null for that field.`;
       parsedData = JSON.parse(cleanContent);
     } catch (parseError) {
       console.error('Failed to parse Gemini response:', content);
-      throw new Error('Failed to parse response as JSON');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Failed to parse response as JSON',
+          details: content
+        }),
+        { 
+          status: 502,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
     // Validate the structure
     if (!parsedData.deliveryNoteNumber || !Array.isArray(parsedData.items)) {
-      throw new Error('Invalid response structure');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid response structure',
+          details: 'Missing deliveryNoteNumber or items array'
+        }),
+        { 
+          status: 502,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
     const elapsed = Date.now() - startTime;
@@ -146,13 +197,14 @@ ACCURACY IS CRITICAL. If unclear, return null for that field.`;
     const elapsed = Date.now() - startTime;
     console.error(`❌ Error in analyze-delivery-note after ${elapsed}ms:`, error);
     
+    // Return 500 for server-side errors
     return new Response(
       JSON.stringify({ 
         error: error instanceof Error ? error.message : 'Unknown error',
         details: error instanceof Error ? error.stack : undefined
       }),
       { 
-        status: 200,
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
