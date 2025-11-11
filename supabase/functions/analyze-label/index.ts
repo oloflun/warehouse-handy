@@ -20,25 +20,14 @@ serve(async (req) => {
       throw new Error("No image provided");
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
+    const GOOGLE_AI_API_KEY = Deno.env.get('GOOGLE_AI_API_KEY');
+    if (!GOOGLE_AI_API_KEY) {
+      throw new Error('GOOGLE_AI_API_KEY is not configured. Please add it to Supabase Edge Function environment variables.');
     }
 
-    console.log("Analyzing label with AI...");
+    console.log("Analyzing label...");
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "system",
-            content: `Du är en expert på att läsa produktetiketter och försändelseetiketter med EXTREM PRECISION. 
+    const systemPrompt = `Du är en expert på att läsa produktetiketter och försändelseetiketter med EXTREM PRECISION. 
 
 KRITISKA INSTRUKTIONER:
 
@@ -66,18 +55,9 @@ KRITISKA INSTRUKTIONER:
    - Om osäker på en siffra, inkludera ändå men markera låg confidence
    - Prioritera precision över kvantitet
 
-**VIKTIGT**: Var extremt noggrann med siffror som 1/I, 0/O, 6/8, 2/Z för att undvika förväxlingar.`
-          },
-          {
-            role: "user",
-            content: [
-              {
-                type: "image_url",
-                image_url: { url: image }
-              },
-              {
-                type: "text",
-                text: `Analysera denna produktetikett med MAXIMAL NOGGRANNHET:
+**VIKTIGT**: Var extremt noggrann med siffror som 1/I, 0/O, 6/8, 2/Z för att undvika förväxlingar.
+
+Analysera denna produktetikett med MAXIMAL NOGGRANNHET:
 
 1. Extrahera ALLA artikelnummer - var EXTREMT noggrann med varje siffra
 2. Extrahera ALLA produktnamn och beskrivningar
@@ -85,67 +65,71 @@ KRITISKA INSTRUKTIONER:
 4. Om text är delvis synlig, extrahera det som är läsbart
 5. Dubbelkolla alla sifferkombinationer för precision
 
-OBS: Artikelnummer som "149216" och "149126" är OLIKA - var extremt noggrann!`
-              }
-            ]
-          }
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "extract_label_info",
-              description: "Extract article numbers and product names from a shipping/product label",
-              parameters: {
-                type: "object",
-                properties: {
-                  article_numbers: {
-                    type: "array",
-                    items: { type: "string" },
-                    description: "All article numbers, SKUs, or item codes found (EXACT digits/characters)"
-                  },
-                  product_names: {
-                    type: "array",
-                    items: { type: "string" },
-                    description: "All product names/descriptions found"
-                  },
-                  confidence: {
-                    type: "string",
-                    enum: ["high", "medium", "low"],
-                    description: "Confidence in extraction: high=clear text, medium=some blur/angle, low=difficult to read"
-                  },
-                  warnings: {
-                    type: "array",
-                    items: { type: "string" },
-                    description: "List any reading difficulties: tilted, blurry, partial, poor lighting, etc."
-                  }
+OBS: Artikelnummer som "149216" och "149126" är OLIKA - var extremt noggrann!
+
+Return ONLY valid JSON in this exact format (no markdown, no explanations):
+{
+  "article_numbers": ["string array of all article numbers found"],
+  "product_names": ["string array of all product names found"],
+  "confidence": "high|medium|low",
+  "warnings": ["optional array of reading difficulties"]
+}`;
+
+    // Format for Google Gemini API
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GOOGLE_AI_API_KEY}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: systemPrompt
                 },
-                required: ["article_numbers", "product_names", "confidence"]
-              }
+                {
+                  inline_data: {
+                    mime_type: 'image/jpeg',
+                    data: image.split(',')[1] // Remove data:image/jpeg;base64, prefix
+                  }
+                }
+              ]
             }
+          ],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 500
           }
-        ],
-        tool_choice: { type: "function", function: { name: "extract_label_info" } },
-        temperature: 0.1, // Lower temperature for more consistent results
-        max_tokens: 500   // Reduce tokens for faster response
-      })
-    });
+        }),
+      }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("AI API error:", response.status, errorText);
-      throw new Error(`AI API error: ${response.status}`);
+      console.error("Gemini API error:", response.status, errorText);
+      throw new Error(`Gemini API error: ${response.status}`);
     }
 
     const data = await response.json();
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
     
-    // Extract tool call results
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall) {
-      throw new Error("No tool call in response");
+    if (!content) {
+      throw new Error("No response from Gemini API");
     }
 
-    const result = JSON.parse(toolCall.function.arguments);
+    // Parse the JSON response
+    let result;
+    try {
+      // Remove markdown code blocks if present
+      const cleanContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      result = JSON.parse(cleanContent);
+    } catch (parseError) {
+      console.error('Failed to parse Gemini response:', content);
+      throw new Error('Failed to parse Gemini response as JSON');
+    }
     
     const elapsed = Date.now() - startTime;
     console.log(`✅ Label analyzed in ${elapsed}ms`);
