@@ -19,25 +19,14 @@ serve(async (req) => {
       throw new Error('No image data provided');
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    const GOOGLE_AI_API_KEY = Deno.env.get('GOOGLE_AI_API_KEY');
+    if (!GOOGLE_AI_API_KEY) {
+      throw new Error('GOOGLE_AI_API_KEY not configured. Please add it to Supabase Edge Function environment variables.');
     }
 
-    console.log('Analyzing delivery note with AI...');
+    console.log('Analyzing delivery note...');
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'system',
-            content: `You are an expert delivery note (följesedel) analyzer for Swedish warehouse operations. Extract structured data with EXTREME ACCURACY.
+    const systemPrompt = `You are an expert delivery note (följesedel) analyzer for Swedish warehouse operations. Extract structured data with EXTREME ACCURACY.
 
 CRITICAL INSTRUCTIONS:
 
@@ -78,40 +67,53 @@ CRITICAL INSTRUCTIONS:
   ]
 }
 
-ACCURACY IS CRITICAL. If unclear, return null for that field.`
-          },
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: 'Analyze this delivery note image and extract all information according to the format specified.'
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: imageData
+ACCURACY IS CRITICAL. If unclear, return null for that field.`;
+
+    const userPrompt = 'Analyze this delivery note image and extract all information according to the format specified.';
+
+    // Format for Google Gemini API
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GOOGLE_AI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: `${systemPrompt}\n\n${userPrompt}`
+                },
+                {
+                  inline_data: {
+                    mime_type: 'image/jpeg',
+                    data: imageData.split(',')[1] // Remove data:image/jpeg;base64, prefix
+                  }
                 }
-              }
-            ]
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 1500
           }
-        ],
-        temperature: 0.1,      // Lower for consistency
-        max_tokens: 1500       // Reduced for speed (was 2000)
-      }),
-    });
+        }),
+      }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('AI API error:', response.status, errorText);
-      throw new Error(`AI API error: ${response.status}`);
+      console.error('Gemini API error:', response.status, errorText);
+      throw new Error(`Gemini API error: ${response.status}`);
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!content) {
-      throw new Error('No response from AI');
+      throw new Error('No response from Gemini API');
     }
 
     // Parse the JSON response
@@ -121,13 +123,13 @@ ACCURACY IS CRITICAL. If unclear, return null for that field.`
       const cleanContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       parsedData = JSON.parse(cleanContent);
     } catch (parseError) {
-      console.error('Failed to parse AI response:', content);
-      throw new Error('Failed to parse AI response as JSON');
+      console.error('Failed to parse Gemini response:', content);
+      throw new Error('Failed to parse response as JSON');
     }
 
     // Validate the structure
     if (!parsedData.deliveryNoteNumber || !Array.isArray(parsedData.items)) {
-      throw new Error('Invalid response structure from AI');
+      throw new Error('Invalid response structure');
     }
 
     const elapsed = Date.now() - startTime;

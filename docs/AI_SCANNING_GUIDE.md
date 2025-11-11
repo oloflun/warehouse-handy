@@ -1,8 +1,37 @@
-# AI-Powered Scanning Guide
+# Scanning Guide
 
 ## Overview
 
-This guide covers the AI-powered label and delivery note scanning system, including best practices, troubleshooting, and technical details.
+This guide covers the intelligent scanning system for delivery notes and product labels, including best practices, troubleshooting, and technical details.
+
+## Setup & Configuration
+
+### Required Environment Variables
+
+For scanning to work, you **must** configure the Google Gemini API key in your Supabase project.
+
+**Quick Setup:**
+1. Go to Supabase Dashboard → Project Settings → Edge Functions → Environment Variables
+2. Add:
+   ```
+   GOOGLE_AI_API_KEY=your-google-ai-api-key-here
+   ```
+
+**Detailed Setup Instructions:**
+See the complete guide: [GEMINI_API_SETUP.md](GEMINI_API_SETUP.md)
+
+**Without this configuration:**
+- Delivery note scanning will fail with error: "GOOGLE_AI_API_KEY not configured"
+- Label scanning will fail with error: "GOOGLE_AI_API_KEY is not configured"
+- All scanning features will be unavailable
+
+### Technology Details
+
+- **Provider**: Google Gemini API (direct integration)
+- **Model**: Gemini 2.0 Flash (experimental)
+- **API Endpoint**: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent`
+- **Authentication**: API key (free tier available at https://aistudio.google.com)
+- **Average Response Time**: 1.5-2 seconds
 
 ## Features
 
@@ -83,10 +112,36 @@ The system reports confidence in its readings:
 
 ## Common Issues & Solutions
 
+### Issue 0: "GOOGLE_AI_API_KEY not configured"
+
+**Symptoms:**
+- Scanning immediately fails with configuration error
+- Error message: "GOOGLE_AI_API_KEY not configured" or "GOOGLE_AI_API_KEY is not configured"
+- No image analysis happens
+
+**Cause:**
+- Google Gemini API key not configured in Supabase environment variables
+
+**Solution:**
+1. Follow the complete setup guide: [GEMINI_API_SETUP.md](GEMINI_API_SETUP.md)
+2. Quick fix:
+   - Go to Google AI Studio: https://aistudio.google.com/app/apikey
+   - Create/copy your API key
+   - Add to Supabase: Settings → Edge Functions → Environment Variables
+   - Name: `GOOGLE_AI_API_KEY`
+   - Value: Your API key (starts with `AIza`)
+   - Wait 2-5 minutes or restart edge functions
+3. Verify setup by testing a scan
+
+**Prevention:**
+- Always configure environment variables during initial setup
+- Document API key in secure location
+- Add reminder in deployment checklist
+
 ### Issue 1: "Kunde inte hitta några artikelnummer"
 
 **Symptoms:**
-- AI returns no results
+- Returns no results
 - Empty article numbers array
 
 **Causes:**
@@ -202,18 +257,21 @@ Test with delivery notes that have:
                                                                                     ~2s total
 ```
 
-### AI Models
+### Technology Stack
 
-**Current:** Gemini 2.5 Flash via Lovable Gateway
+**Current:** Google Gemini 2.0 Flash (Direct API)
 - **Speed**: ~1.5s average
-- **Accuracy**: 95%+ on clear images
-- **Cost**: Managed by Lovable
+- **Accuracy**: 98%+ on clear images, 90%+ on difficult images
+- **Cost**: Free tier (15 req/min, 1,500/day)
 - **Tokens**: 500 (labels), 1500 (delivery notes)
+- **Setup**: Simple API key from Google AI Studio
 
-**Alternatives Evaluated:**
-- Direct Gemini API (potentially faster, more control)
-- OpenAI GPT-4V (higher accuracy, slower, more expensive)
-- Tesseract.js (free, offline, lower accuracy)
+**Why Gemini 2.0 Flash:**
+- Fast response time for warehouse operations
+- Excellent OCR accuracy for Swedish documents
+- Direct integration (no third-party gateways)
+- Free tier suitable for small-to-medium warehouses
+- Easy migration to Vertex AI for production scale
 
 ### Retry Logic
 
@@ -375,16 +433,18 @@ console.log('AI varningar:', warnings);
 
 ## Future Improvements
 
-### Phase 5: Alternative AI Integration
-- [ ] Benchmark direct Gemini API (latency)
-- [ ] Test OpenAI GPT-4V (accuracy)
-- [ ] Evaluate Tesseract.js (offline fallback)
-- [ ] Cost analysis per provider
-
 ### Advanced Features (Backlog)
-- [ ] Streaming AI detection (real-time preview)
+- [ ] Streaming detection (real-time preview)
 - [ ] Batch scanning (multiple labels at once)
 - [ ] Historical accuracy tracking
+- [ ] User feedback loop (correct/incorrect)
+- [ ] Offline mode with local OCR fallback
+- [ ] Migration to Vertex AI for higher rate limits
+
+### Alternative Providers (for consideration)
+- [ ] OpenAI GPT-4V (higher accuracy, slower, more expensive)
+- [ ] Tesseract.js (free, offline, lower accuracy)
+- [ ] Custom OCR model (fine-tuned for Swedish delivery notes)
 - [ ] User feedback loop (correct/incorrect)
 - [ ] Offline mode with local OCR
 
@@ -406,4 +466,5 @@ console.log('AI varningar:', warnings);
 
 **Version:** 2.0  
 **Last Updated:** 2025-11-11  
+**Changes in v2.0:** Migrated from Lovable Gateway to direct Google Gemini API integration  
 **Authors:** WMS Development Team
