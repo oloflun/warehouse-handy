@@ -10,6 +10,8 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const startTime = Date.now();
+
   try {
     const { imageData } = await req.json();
     
@@ -94,8 +96,8 @@ ACCURACY IS CRITICAL. If unclear, return null for that field.`
             ]
           }
         ],
-        temperature: 0.1,
-        max_tokens: 2000
+        temperature: 0.1,      // Lower for consistency
+        max_tokens: 1500       // Reduced for speed (was 2000)
       }),
     });
 
@@ -111,8 +113,6 @@ ACCURACY IS CRITICAL. If unclear, return null for that field.`
     if (!content) {
       throw new Error('No response from AI');
     }
-
-    console.log('AI response:', content);
 
     // Parse the JSON response
     let parsedData;
@@ -130,7 +130,9 @@ ACCURACY IS CRITICAL. If unclear, return null for that field.`
       throw new Error('Invalid response structure from AI');
     }
 
-    console.log('Successfully analyzed delivery note:', parsedData.deliveryNoteNumber);
+    const elapsed = Date.now() - startTime;
+    console.log(`✅ Delivery note analyzed in ${elapsed}ms`);
+    console.log('Delivery note:', parsedData.deliveryNoteNumber);
     console.log('Found items:', parsedData.items.length);
 
     return new Response(
@@ -139,7 +141,9 @@ ACCURACY IS CRITICAL. If unclear, return null for that field.`
     );
 
   } catch (error) {
-    console.error('Error in analyze-delivery-note:', error);
+    const elapsed = Date.now() - startTime;
+    console.error(`❌ Error in analyze-delivery-note after ${elapsed}ms:`, error);
+    
     return new Response(
       JSON.stringify({ 
         error: error instanceof Error ? error.message : 'Unknown error',

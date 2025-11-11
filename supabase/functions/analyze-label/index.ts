@@ -11,6 +11,8 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const startTime = Date.now();
+  
   try {
     const { image } = await req.json();
     
@@ -123,7 +125,9 @@ OBS: Artikelnummer som "149216" och "149126" är OLIKA - var extremt noggrann!`
             }
           }
         ],
-        tool_choice: { type: "function", function: { name: "extract_label_info" } }
+        tool_choice: { type: "function", function: { name: "extract_label_info" } },
+        temperature: 0.1, // Lower temperature for more consistent results
+        max_tokens: 500   // Reduce tokens for faster response
       })
     });
 
@@ -134,8 +138,7 @@ OBS: Artikelnummer som "149216" och "149126" är OLIKA - var extremt noggrann!`
     }
 
     const data = await response.json();
-    console.log("AI response:", JSON.stringify(data, null, 2));
-
+    
     // Extract tool call results
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall) {
@@ -143,6 +146,9 @@ OBS: Artikelnummer som "149216" och "149126" är OLIKA - var extremt noggrann!`
     }
 
     const result = JSON.parse(toolCall.function.arguments);
+    
+    const elapsed = Date.now() - startTime;
+    console.log(`✅ Label analyzed in ${elapsed}ms`);
     console.log("Extracted data:", result);
 
     return new Response(JSON.stringify(result), {
@@ -150,13 +156,16 @@ OBS: Artikelnummer som "149216" och "149126" är OLIKA - var extremt noggrann!`
     });
 
   } catch (error) {
-    console.error("Error in analyze-label:", error);
+    const elapsed = Date.now() - startTime;
+    console.error(`❌ Error in analyze-label after ${elapsed}ms:`, error);
+    
     return new Response(
       JSON.stringify({ 
         error: error instanceof Error ? error.message : "Unknown error",
         article_numbers: [],
         product_names: [],
-        confidence: "low"
+        confidence: "low",
+        warnings: ["Analysis failed: " + (error instanceof Error ? error.message : "Unknown error")]
       }), 
       {
         status: 200,
