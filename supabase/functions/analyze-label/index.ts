@@ -19,10 +19,14 @@ serve(async (req) => {
     if (!image) {
       return new Response(
         JSON.stringify({ 
-          error: 'No image provided'
+          error: 'No image provided',
+          article_numbers: [],
+          product_names: [],
+          confidence: 'low',
+          warnings: ['No image provided']
         }),
         { 
-          status: 400,
+          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
@@ -32,10 +36,14 @@ serve(async (req) => {
     if (!GOOGLE_AI_API_KEY) {
       return new Response(
         JSON.stringify({ 
-          error: 'GOOGLE_AI_API_KEY is not configured. Please add it to Supabase Edge Function environment variables.'
+          error: 'GOOGLE_AI_API_KEY is not configured. Please add it to Supabase Edge Function environment variables.',
+          article_numbers: [],
+          product_names: [],
+          confidence: 'low',
+          warnings: ['GOOGLE_AI_API_KEY not configured']
         }),
         { 
-          status: 500,
+          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
@@ -129,10 +137,14 @@ Return ONLY valid JSON in this exact format (no markdown, no explanations):
       return new Response(
         JSON.stringify({ 
           error: `Gemini API error: ${response.status}`,
-          details: errorText
+          details: errorText,
+          article_numbers: [],
+          product_names: [],
+          confidence: 'low',
+          warnings: [`Gemini API error: ${response.status}`]
         }),
         { 
-          status: 502,
+          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
@@ -144,10 +156,14 @@ Return ONLY valid JSON in this exact format (no markdown, no explanations):
     if (!content) {
       return new Response(
         JSON.stringify({ 
-          error: 'No response from Gemini API'
+          error: 'No response from Gemini API',
+          article_numbers: [],
+          product_names: [],
+          confidence: 'low',
+          warnings: ['No response from Gemini API']
         }),
         { 
-          status: 502,
+          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
@@ -164,10 +180,14 @@ Return ONLY valid JSON in this exact format (no markdown, no explanations):
       return new Response(
         JSON.stringify({ 
           error: 'Failed to parse Gemini response as JSON',
-          details: content
+          details: content,
+          article_numbers: [],
+          product_names: [],
+          confidence: 'low',
+          warnings: ['Failed to parse Gemini response']
         }),
         { 
-          status: 502,
+          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
@@ -185,7 +205,7 @@ Return ONLY valid JSON in this exact format (no markdown, no explanations):
     const elapsed = Date.now() - startTime;
     console.error(`❌ Error in analyze-label after ${elapsed}ms:`, error);
     
-    // Return 500 for server-side errors instead of 200
+    // Always return 200 with error details in body
     return new Response(
       JSON.stringify({ 
         error: error instanceof Error ? error.message : "Unknown error",
@@ -195,7 +215,7 @@ Return ONLY valid JSON in this exact format (no markdown, no explanations):
         warnings: ["Analysis failed: " + (error instanceof Error ? error.message : "Unknown error")]
       }), 
       {
-        status: 500,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
