@@ -273,10 +273,15 @@ const Scanner = () => {
         return;
       }
       
-      // Create canvas and capture frame
+      // Create canvas and capture frame at higher resolution
       const canvas = document.createElement("canvas");
-      canvas.width = videoElement.videoWidth;
-      canvas.height = videoElement.videoHeight;
+      
+      // Use higher resolution for better OCR accuracy
+      const targetWidth = Math.min(videoElement.videoWidth, 1920);
+      const targetHeight = Math.min(videoElement.videoHeight, 1080);
+      
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
       const ctx = canvas.getContext("2d");
       
       if (!ctx) {
@@ -284,33 +289,48 @@ const Scanner = () => {
         return;
       }
       
-      ctx.drawImage(videoElement, 0, 0);
-      // Använd högre kompression för snabbare uppladdning (0.8 istället för 0.9)
-      // Edge function är flaskhalsen, inte AI-modellen
-      const imageBase64 = canvas.toDataURL("image/jpeg", 0.8);
+      // Draw with higher quality
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(videoElement, 0, 0, targetWidth, targetHeight);
+      
+      // Use 0.85 quality for better balance between speed and accuracy
+      const imageBase64 = canvas.toDataURL("image/jpeg", 0.85);
       setCapturedImage(imageBase64);
+      
+      // Visual feedback
+      toast.success("Bild tagen! Analyserar...", { duration: 1000 });
       
       // Analyze with AI
       await analyzeLabel(imageBase64);
     } catch (err) {
       console.error("Kunde inte ta foto:", err);
-      toast.error("Kunde inte ta foto");
+      toast.error("Kunde inte ta foto. Försök igen.");
     }
   };
 
-  const analyzeLabel = async (imageBase64: string) => {
+  const analyzeLabel = async (imageBase64: string, retryCount = 0) => {
     // Skippa om redan en analys är i gång MED samma bild
     if (isAnalyzing) {
       return;
     }
     
     setIsAnalyzing(true);
-    toast.loading("Analyserar etikett med AI...", { id: "ai-analysis" });
+    const maxRetries = 2;
+    const attempt = retryCount + 1;
+    const toastId = "ai-analysis";
+    
+    toast.loading(
+      attempt > 1 
+        ? `Analyserar etikett... (försök ${attempt}/${maxRetries + 1})` 
+        : "Analyserar etikett...", 
+      { id: toastId }
+    );
     
     try {
-      // Timeout på 8 sekunder för edge function
+      // Timeout på 10 sekunder för edge function
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("AI-analys timeout")), 8000)
+        setTimeout(() => reject(new Error("Timeout - försök igen")), 10000)
       );
       
       const analysisPromise = supabase.functions.invoke("analyze-label", {
@@ -323,22 +343,68 @@ const Scanner = () => {
       
       setAiResults(data);
       
+      // Show confidence and warnings to user
+      if (data.confidence === 'low') {
+        toast.warning("⚠️ Låg läsbarhet - kontrollera resultatet noga", {
+          id: toastId,
+          duration: 4000
+        });
+      } else if (data.confidence === 'medium') {
+        toast.info("ℹ️ Medelhög läsbarhet - verifiera artikelnummer", {
+          id: toastId,
+          duration: 3000
+        });
+      }
+      
+      if (data.warnings && data.warnings.length > 0) {
+        console.log("AI varningar:", data.warnings);
+      }
+      
       if (data.article_numbers.length === 0 && data.product_names.length === 0) {
-        toast.error("Kunde inte hitta några artikelnummer eller produktnamn", {
-          id: "ai-analysis"
+        // Retry if we have attempts left
+        if (retryCount < maxRetries) {
+          console.log(`Inga resultat, försöker igen (${attempt}/${maxRetries + 1})...`);
+          toast.dismiss(toastId);
+          setIsAnalyzing(false);
+          
+          // Wait a bit before retry
+          await new Promise(resolve => setTimeout(resolve, 500));
+          return await analyzeLabel(imageBase64, retryCount + 1);
+        }
+        
+        toast.error("Kunde inte hitta några artikelnummer eller produktnamn. Försök ta en tydligare bild.", {
+          id: toastId,
+          duration: 5000
         });
         return;
       }
       
-      toast.dismiss("ai-analysis");
+      toast.dismiss(toastId);
       console.log(`✅ AI hittade ${data.article_numbers.length} artikelnummer och ${data.product_names.length} produktnamn`);
+      console.log(`📊 Tillförlitlighet: ${data.confidence}`);
       
       // Auto-match against products
       await matchProductsFromAI(data);
       
     } catch (err) {
       console.error("AI-analys misslyckades:", err);
-      toast.error("Kunde inte analysera etikett", { id: "ai-analysis" });
+      
+      // Retry on timeout or network errors
+      if (retryCount < maxRetries && err instanceof Error && 
+          (err.message.includes('Timeout') || err.message.includes('network'))) {
+        console.log(`Timeout/network fel, försöker igen (${attempt}/${maxRetries + 1})...`);
+        toast.dismiss(toastId);
+        setIsAnalyzing(false);
+        
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return await analyzeLabel(imageBase64, retryCount + 1);
+      }
+      
+      const errorMsg = err instanceof Error ? err.message : "Kunde inte analysera etikett";
+      toast.error(errorMsg + ". Ta en ny bild eller ange artikelnummer manuellt.", { 
+        id: toastId,
+        duration: 6000
+      });
     } finally {
       setIsAnalyzing(false);
     }
@@ -1244,9 +1310,19 @@ const Scanner = () => {
                       <CardContent className="p-4 space-y-2">
                         <div className="flex justify-between items-start">
                           <div className="flex-1">
+                            {/* Display delivery note godsmärke (order_number) at the top if available */}
+                            {orderLine.delivery_note_order && (
+                              <div className="flex items-center gap-2 mb-2">
+                                <p className="font-bold text-xl text-primary">Godsmärke: {orderLine.delivery_note_order}</p>
+                                <Badge variant="default" className="bg-green-600">
+                                  Följesedel
+                                </Badge>
+                              </div>
+                            )}
+                            
                             <div className="flex items-center gap-2">
                               <p className="font-bold text-lg">Order {order.order_number}</p>
-                              {orderLine.has_delivery_note && (
+                              {orderLine.has_delivery_note && !orderLine.delivery_note_order && (
                                 <Badge variant="default" className="bg-green-600">
                                   Följesedel
                                 </Badge>
@@ -1263,16 +1339,19 @@ const Scanner = () => {
                           </span>
                         </div>
                         
-                        {order.customer_notes && (
+                        {/* Only show customer_notes if NO delivery note godsmärke exists */}
+                        {order.customer_notes && !orderLine.delivery_note_order && (
                           <div className="bg-yellow-50 p-2 rounded border border-yellow-200">
                             <p className="text-sm font-medium text-yellow-900">
-                              📝 Godsmärke: {order.customer_notes}
+                              📝 Notering: {order.customer_notes}
                             </p>
                           </div>
                         )}
                         
                         <div className="text-sm">
-                          <p>Antal att plocka: <span className="font-bold">{orderLine.quantity_ordered}</span></p>
+                          <p className="font-semibold">Artikelnr: {product.barcode || product.fdt_sellus_article_id}</p>
+                          <p className="text-muted-foreground">{product.name}</p>
+                          <p className="mt-1">Antal att plocka: <span className="font-bold">{orderLine.quantity_ordered}</span></p>
                           <p className="text-xs text-muted-foreground">
                             Order datum: {new Date(order.order_date).toLocaleDateString('sv-SE')}
                           </p>
