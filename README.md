@@ -1,3 +1,16 @@
+## Recent Fixes & Summaries
+
+A chronological history of important fixes and improvements to the warehouse-handy system:
+
+- **[Gemini Scanner Error Handling & Stability](./FIX_SUMMARY_GEMINI_SCANNER.md)** - Fixed edge function error codes (200→400/500/502) and documented scanning best practices
+- **[FDT Sync Fix](./FDT_SYNC_FIX_SUMMARY.md)** - Resolved inventory synchronization issues with FDT Sellus API
+- **[Edge Function Fix](./EDGE_FUNCTION_FIX_SUMMARY.md)** - General edge function error handling improvements
+- **[Delivery Note Scanning](./FIX_SUMMARY_DELIVERY_NOTE_SCANNING.md)** - Delivery note scanning feature implementation and fixes
+- **[API Authorization](./API_AUTHORIZATION_FIX.md)** - FDT API authentication method fixes
+- **[Migration Fix](./MIGRATION_FIX_SUMMARY.md)** - Database migration and schema fixes
+
+---
+
 ## Deployment Configuration
 
 This project is configured to deploy automatically to Vercel only when changes are pushed or merged to the `main` branch.

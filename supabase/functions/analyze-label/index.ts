@@ -17,12 +17,28 @@ serve(async (req) => {
     const { image } = await req.json();
     
     if (!image) {
-      throw new Error("No image provided");
+      return new Response(
+        JSON.stringify({ 
+          error: 'No image provided'
+        }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
     const GOOGLE_AI_API_KEY = Deno.env.get('GOOGLE_AI_API_KEY');
     if (!GOOGLE_AI_API_KEY) {
-      throw new Error('GOOGLE_AI_API_KEY is not configured. Please add it to Supabase Edge Function environment variables.');
+      return new Response(
+        JSON.stringify({ 
+          error: 'GOOGLE_AI_API_KEY is not configured. Please add it to Supabase Edge Function environment variables.'
+        }),
+        { 
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
     console.log("Analyzing label...");
@@ -110,14 +126,31 @@ Return ONLY valid JSON in this exact format (no markdown, no explanations):
     if (!response.ok) {
       const errorText = await response.text();
       console.error("Gemini API error:", response.status, errorText);
-      throw new Error(`Gemini API error: ${response.status}`);
+      return new Response(
+        JSON.stringify({ 
+          error: `Gemini API error: ${response.status}`,
+          details: errorText
+        }),
+        { 
+          status: 502,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
     const data = await response.json();
     const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
     
     if (!content) {
-      throw new Error("No response from Gemini API");
+      return new Response(
+        JSON.stringify({ 
+          error: 'No response from Gemini API'
+        }),
+        { 
+          status: 502,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
     // Parse the JSON response
@@ -128,7 +161,16 @@ Return ONLY valid JSON in this exact format (no markdown, no explanations):
       result = JSON.parse(cleanContent);
     } catch (parseError) {
       console.error('Failed to parse Gemini response:', content);
-      throw new Error('Failed to parse Gemini response as JSON');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Failed to parse Gemini response as JSON',
+          details: content
+        }),
+        { 
+          status: 502,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
     
     const elapsed = Date.now() - startTime;
@@ -143,6 +185,7 @@ Return ONLY valid JSON in this exact format (no markdown, no explanations):
     const elapsed = Date.now() - startTime;
     console.error(`❌ Error in analyze-label after ${elapsed}ms:`, error);
     
+    // Return 500 for server-side errors instead of 200
     return new Response(
       JSON.stringify({ 
         error: error instanceof Error ? error.message : "Unknown error",
@@ -152,7 +195,7 @@ Return ONLY valid JSON in this exact format (no markdown, no explanations):
         warnings: ["Analysis failed: " + (error instanceof Error ? error.message : "Unknown error")]
       }), 
       {
-        status: 200,
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
