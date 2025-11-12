@@ -12,7 +12,7 @@ interface DiagnosticResult {
   diagnostics: {
     timestamp: string;
     environment: {
-      GOOGLE_AI_API_KEY: {
+      GEMINI_API_KEY: {
         configured: boolean;
         length?: number;
         prefix?: string;
@@ -64,13 +64,13 @@ const GeminiDiagnostics = () => {
       setDiagnosticResult(data);
       
       // Show summary toast
-      const apiConfigured = data.diagnostics.environment.GOOGLE_AI_API_KEY.configured;
+      const apiConfigured = data.diagnostics.environment.GEMINI_API_KEY.configured;
       const apiWorks = data.diagnostics.tests.geminiVisionAPI?.success;
       
       if (apiConfigured && apiWorks) {
         toast.success('✅ Gemini API is working correctly!');
       } else if (!apiConfigured) {
-        toast.error('❌ GOOGLE_AI_API_KEY is not configured');
+        toast.error('❌ GEMINI_API_KEY is not configured');
       } else {
         toast.warning('⚠️ API key is configured but API calls are failing');
       }
