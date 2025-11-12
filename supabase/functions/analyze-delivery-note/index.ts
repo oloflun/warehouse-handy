@@ -144,15 +144,26 @@ ACCURACY IS CRITICAL. If unclear, return null for that field.`;
     }
 
     const data = await response.json();
+    console.log('Raw Gemini API response:', JSON.stringify(data, null, 2));
+    
     const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const finishReason = data.candidates?.[0]?.finishReason;
 
-    if (!content) {
+    // Check for safety blocks or other issues
+    if (finishReason && finishReason !== 'STOP') {
+      console.error('Gemini finished with reason:', finishReason);
       return new Response(
         JSON.stringify({ 
-          error: 'No response from Gemini API',
+          error: `Gemini API blocked or failed: ${finishReason}`,
+          details: finishReason === 'SAFETY' 
+            ? 'Response blocked by safety filters. Try a clearer image.'
+            : finishReason === 'MAX_TOKENS'
+            ? 'Response too long. Try scanning a smaller delivery note.'
+            : `Finish reason: ${finishReason}`,
           deliveryNoteNumber: '',
           cargoMarking: null,
-          items: []
+          items: [],
+          rawResponse: data
         }),
         { 
           status: 200,
@@ -161,14 +172,36 @@ ACCURACY IS CRITICAL. If unclear, return null for that field.`;
       );
     }
 
+    if (!content) {
+      console.error('No content in Gemini response, full response:', data);
+      return new Response(
+        JSON.stringify({ 
+          error: 'No response content from Gemini API',
+          details: 'API returned successfully but no text content was found',
+          deliveryNoteNumber: '',
+          cargoMarking: null,
+          items: [],
+          rawResponse: data
+        }),
+        { 
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    console.log('Gemini text response:', content);
+
     // Parse the JSON response
     let parsedData;
     try {
       // Remove markdown code blocks if present
       const cleanContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      console.log('Attempting to parse cleaned content:', cleanContent);
       parsedData = JSON.parse(cleanContent);
     } catch (parseError) {
       console.error('Failed to parse Gemini response:', content);
+      console.error('Parse error:', parseError);
       return new Response(
         JSON.stringify({ 
           error: 'Failed to parse response as JSON',
