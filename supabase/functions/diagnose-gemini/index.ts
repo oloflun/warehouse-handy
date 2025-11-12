@@ -177,7 +177,7 @@ serve(async (req) => {
       }
     }
     } else {
-      diagnostics.tests.geminiVisionAPI = {
+      diagnostics.tests.visionAPI = {
         success: false,
         error: 'GOOGLE_AI_API_KEY not configured',
         instructions: 'Configure in Supabase Dashboard → Settings → Edge Functions → Environment Variables',
@@ -195,7 +195,7 @@ serve(async (req) => {
       recommendations.push('Add in: Supabase Dashboard → Settings → Edge Functions → Environment Variables');
       recommendations.push('Variable name: GOOGLE_AI_API_KEY');
       recommendations.push('Wait 2-5 minutes after adding for changes to take effect');
-    } else if (diagnostics.tests.geminiVisionAPI?.success) {
+    } else if (diagnostics.tests.visionAPI?.success) {
       recommendations.push('✅ Gemini API is working correctly!');
       recommendations.push('If scanning still fails:');
       recommendations.push('  1. Check image quality (not too dark/blurry)');
