@@ -6,15 +6,25 @@
 
 1. Go to your Supabase Dashboard
 2. Navigate to: Project Settings → Edge Functions → Environment Variables
-3. Add these three variables:
+3. Add these required variables:
 
+**For FDT API Integration:**
 ```
 FDT_SELLUS_BASE_URL=https://your-fdt-api-url.com/v1
 FDT_SELLUS_API_KEY=your-api-key-here
 FDT_SELLUS_BRANCH_ID=5
 ```
 
-**Important**: Replace the placeholder values with your actual FDT API credentials. Contact FDT Sellus support if you don't have these.
+**For Scanning Features (Delivery Notes & Labels):**
+```
+GOOGLE_AI_API_KEY=your-google-ai-api-key-here
+```
+
+**Important**: 
+- Replace the placeholder values with your actual credentials
+- Contact FDT Sellus support for FDT API credentials
+- For Google AI API key setup, see detailed guide: [docs/GEMINI_API_SETUP.md](docs/GEMINI_API_SETUP.md)
+- **The GOOGLE_AI_API_KEY is required for scanning features**. Without it, delivery note and label scanning will fail with a configuration error.
 
 ### Step 2: Test the Connection (2 minutes)
 

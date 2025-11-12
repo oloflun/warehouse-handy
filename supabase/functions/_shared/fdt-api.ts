@@ -29,19 +29,26 @@ export async function callFDTApi({ endpoint, method = 'GET', body }: FDTApiOptio
     console.log('📤 Request body:', JSON.stringify(body, null, 2));
   }
   
-  // Use the Sellus API Key directly as Authorization header
-  console.log(`🔐 Using Authorization header with Sellus API Key`);
+  // Use the Sellus API Key with Bearer token format
+  console.log(`🔐 Using Authorization: Bearer {api-key}`);
   
   try {
-    const response = await fetch(fullUrl, {
+    // Build fetch options - only include body for methods that support it
+    const fetchOptions: RequestInit = {
       method,
       headers: {
-        'Authorization': apiKey,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    };
+    
+    // Only add body for methods that support request bodies
+    if (body && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
+      fetchOptions.body = JSON.stringify(body);
+    }
+    
+    const response = await fetch(fullUrl, fetchOptions);
     
     const duration = Date.now() - startTime;
     

@@ -1,9 +1,3 @@
----
-name: "Warehouse Manager"
-description: "Custom agent for warehouse-handy WMS project"
-owner: "oloflun"
-repository: "oloflun/warehouse-handy"
-
 instructions: |
   # Project Context
   You are working on warehouse-handy, a TypeScript/React warehouse management system integrating with FDT Sellus API.
@@ -29,9 +23,11 @@ instructions: |
   
   ### 3. Environment Configuration
   Always remind user these Supabase environment variables must be configured:
-  - FDT_SELLUS_BASE_URL
-  - FDT_SELLUS_API_KEY
+  - FDT_SELLUS_BASE_URL (MUST include https:// prefix - critical!)
+  - FDT_SELLUS_API_KEY (raw key value only, NOT including "Bearer ")
   - FDT_SELLUS_BRANCH_ID (optional, defaults to 5)
+  
+  **CRITICAL**: Missing `https://` in base URL will break all API calls!
   
   ### 4. No AI References in UI
   - Remove ALL "AI" mentions from user-facing text
@@ -39,6 +35,28 @@ instructions: |
   - ❌ "Scanning label with AI" → ✅ "Scannar..."
   - Always notify user when AI references are found and removed
   - Applies to: loading states, buttons, tooltips, errors, all UI text
+  
+  ### 5. Learn from Historical Attempts
+  When working on issues with previous unsuccessful attempts:
+  - Review all previous PRs linked to or referencing the issue
+  - Analyze comments, review feedback, and CI/CD failure logs from earlier attempts
+  - Identify specific errors encountered (compilation, test failures, logic errors, etc.)
+  - Note reviewer feedback and concerns from previous PRs
+  - Document patterns in what was tried and why it failed
+  - Avoid repeating the same approach that failed previously
+  - Consider alternative implementation strategies based on lessons learned
+  - Build upon partial successes while fixing what didn't work
+  - Ensure solution addresses specific failure points from earlier attempts
+  - Test against edge cases that caused previous implementations to fail
+  - Reference previous attempts in PR description to show historical awareness
+  - Explain how your approach differs and why it should succeed where others failed
+  
+  ### 6. Pull Request Workflow
+  - Always create pull requests for all changes, even when not using the coding agent
+  - Never commit directly to main branch (except for urgent hotfixes)
+  - Include comprehensive descriptions in PRs explaining changes and rationale
+  - Reference related issues and previous attempts in PR descriptions
+  - Allow for proper review and validation before merging
   
   ## Technical Standards
   
@@ -128,13 +146,13 @@ instructions: |
   
   - Authentication: JWT tokens in Authorization headers
   - API Integration: FDT Sellus API with branch ID (default: 5)
+  - **FDT API HTTP Methods**: Use POST for updating data (orders, articles, inventory), not PUT/PATCH. PUT is for system settings.
   - Logging: All sync operations with direction (wms_to_fdt), status, duration
   - Error Messages: User-friendly Swedish translations
   - Mobile UX: Optimize for delivery note scanning on phones
   
   ## Project-Specific Notes
   
-  - Repository uses Lovable for some development (auto-commits)
   - Features typically require multiple iterations
   - User prefers comprehensive documentation over brief summaries
   - FDT API Explorer has been problematic—ensure thorough testing
@@ -155,4 +173,9 @@ rules:
   - "Use Swedish for all UI text"
   - "Verify mobile responsiveness"
   - "Create comprehensive documentation for all features"
+  - "FDT Sellus API uses POST for data updates, not PUT - verify with Swagger UI"
+  - "Base URL must include https:// protocol - missing it breaks all API calls"
+  - "CRITICAL: Edge functions MUST return 200 OK status (never 4xx/5xx) - see EDGE_FUNCTION_STATUS_CODE_FIX.md"
+  - "Update this agent config and copilot-instructions.md with important findings when PRs are merged"
+  - "Always create pull requests for changes - never commit directly to main"
 ---

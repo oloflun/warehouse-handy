@@ -272,20 +272,6 @@ const Integrations = () => {
         <div className="grid grid-cols-[320px_1fr] gap-6">
           {/* Vänster kolumn: Navigationskort */}
           <div className="space-y-4">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/scanner')}>
-              <CardHeader className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-blue-500/10">
-                    <QrCode className="h-5 w-5 text-blue-500" />
-                  </div>
-                  <div className="flex-1">
-                    <CardTitle className="text-lg">Scanna</CardTitle>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </div>
-              </CardHeader>
-            </Card>
-
             <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/inventory')}>
               <CardHeader className="p-4">
                 <div className="flex items-center gap-3">
@@ -413,7 +399,6 @@ const Integrations = () => {
               </div>
             </CardHeader>
           </Card>
-
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader onClick={() => navigate('/inventory')} className="cursor-pointer rounded-none">
               <div className="flex items-center justify-between">

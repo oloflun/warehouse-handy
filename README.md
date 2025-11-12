@@ -1,76 +1,15 @@
-# Welcome to your Lovable project
+## Recent Fixes & Summaries
 
-## Project info
+A chronological history of important fixes and improvements to the warehouse-handy system:
 
-**URL**: https://lovable.dev/projects/b185794f-a999-434a-a969-a0d575b36111
+- **[Gemini Scanner Error Handling & Stability](./FIX_SUMMARY_GEMINI_SCANNER.md)** - Fixed edge function error codes (200→400/500/502) and documented scanning best practices
+- **[FDT Sync Fix](./FDT_SYNC_FIX_SUMMARY.md)** - Resolved inventory synchronization issues with FDT Sellus API
+- **[Edge Function Fix](./EDGE_FUNCTION_FIX_SUMMARY.md)** - General edge function error handling improvements
+- **[Delivery Note Scanning](./FIX_SUMMARY_DELIVERY_NOTE_SCANNING.md)** - Delivery note scanning feature implementation and fixes
+- **[API Authorization](./API_AUTHORIZATION_FIX.md)** - FDT API authentication method fixes
+- **[Migration Fix](./MIGRATION_FIX_SUMMARY.md)** - Database migration and schema fixes
 
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/b185794f-a999-434a-a969-a0d575b36111) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/b185794f-a999-434a-a969-a0d575b36111) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+---
 
 ## Deployment Configuration
 
@@ -84,3 +23,60 @@ The deployment configuration is specified in `vercel.json`:
 - **Output directory**: `dist`
 
 This helps prevent unnecessary preview deployments and conserves resources for feature branches.
+
+## FDT Sellus API Configuration
+
+### Critical Configuration Requirements
+
+When configuring the FDT Sellus API integration in Supabase Edge Functions environment variables, ensure:
+
+#### 1. Base URL Must Include `https://` Protocol ⚠️
+
+**INCORRECT** (will break all API calls):
+```
+FDT_SELLUS_BASE_URL=stagesellus.fdt.se/12345/api
+```
+
+**CORRECT**:
+```
+FDT_SELLUS_BASE_URL=https://stagesellus.fdt.se/12345/api
+```
+
+The `https://` prefix is **absolutely critical**. Without it, all API functions will fail.
+
+#### 2. API Key Format - Bearer Token
+
+The `FDT_SELLUS_API_KEY` should contain **only the raw API key value**, not the full Bearer header:
+
+**INCORRECT**:
+```
+FDT_SELLUS_API_KEY=Bearer your-api-key-here
+```
+
+**CORRECT**:
+```
+FDT_SELLUS_API_KEY=your-api-key-here
+```
+
+The system automatically adds the `Bearer` prefix when making API calls.
+
+#### 3. Required Environment Variables
+
+Configure these in **Supabase Dashboard → Settings → Edge Functions → Environment Variables**:
+
+```bash
+FDT_SELLUS_BASE_URL=https://stagesellus.fdt.se/[YOUR_TENANT_ID]/api
+FDT_SELLUS_API_KEY=[your-api-key-value]
+FDT_SELLUS_BRANCH_ID=5  # Optional, defaults to 5
+```
+
+### FDT Sellus API Methods
+
+**Important**: The FDT Sellus API uses **POST** requests for updating/modifying data (orders, articles, inventory), not PUT/PATCH.
+
+- **POST** - Update or modify existing resources (orders, articles, stock levels)
+- **GET** - Retrieve data
+- **PUT** - Update system settings and configuration values
+- **DELETE** - Remove resources
+
+Always refer to the FDT Sellus API Swagger documentation for the correct HTTP method for each endpoint.
