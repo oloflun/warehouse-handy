@@ -2,41 +2,17 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
-import { RefreshCw, CheckCircle2, XCircle, Clock, Package, List, ShoppingCart, ChevronRight, AlertCircle, Check, QrCode, ClipboardList, Settings } from "lucide-react";
+import { Package, List, ShoppingCart, ChevronRight, AlertCircle, Check, QrCode, ClipboardList, Settings } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ProfileButton } from "@/components/ProfileButton";
-interface SyncStatus {
-  id: string;
-  sync_type: string;
-  last_successful_sync: string | null;
-  last_error: string | null;
-  total_synced: number;
-  total_errors: number;
-  is_enabled: boolean;
-}
-interface SyncLog {
-  id: string;
-  sync_type: string;
-  direction: string;
-  status: string;
-  error_message: string | null;
-  created_at: string;
-  duration_ms: number;
-}
+
 const Integrations = () => {
   const navigate = useNavigate();
-  const {
-    toast
-  } = useToast();
-  const [syncStatuses, setSyncStatuses] = useState<SyncStatus[]>([]);
-  const [syncLogs, setSyncLogs] = useState<SyncLog[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
   const [syncing, setSyncing] = useState<Record<string, boolean>>({});
   const [user, setUser] = useState<any>(null);
   const isMobile = useIsMobile();
@@ -78,80 +54,8 @@ const Integrations = () => {
     }) => {
       setUser(session?.user || null);
     });
-    fetchData();
   }, []);
-  const fetchData = async () => {
-    try {
-      const [statusRes, logsRes] = await Promise.all([supabase.from('fdt_sync_status').select('*').order('sync_type'), supabase.from('fdt_sync_log').select('*').order('created_at', {
-        ascending: false
-      }).limit(50)]);
-      if (statusRes.data) setSyncStatuses(statusRes.data);
-      if (logsRes.data) setSyncLogs(logsRes.data);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-  const triggerSync = async (syncType: string) => {
-    setSyncing(prev => ({
-      ...prev,
-      [syncType]: true
-    }));
-    try {
-      const functionMap: Record<string, string> = {
-        'product_import': 'sync-products-from-sellus',
-        'inventory_export': 'sync-inventory-to-sellus',
-        'sale_import': 'sync-sales-from-retail'
-      };
-      const {
-        data,
-        error
-      } = await supabase.functions.invoke(functionMap[syncType]);
-      if (error) throw error;
-      const successMsg = data?.synced !== undefined ? `Synkroniserade ${data.synced} poster${data.errors > 0 ? ` (${data.errors} fel)` : ''}` : 'Synkronisering slutförd';
-      toast({
-        title: "Synkronisering slutförd",
-        description: successMsg,
-        variant: data?.errors > 0 ? "destructive" : "default"
-      });
 
-      // Wait a bit before refreshing to ensure database is updated
-      setTimeout(fetchData, 1000);
-    } catch (error: any) {
-      let errorMsg = error.message || 'Okänt fel uppstod';
-
-      // If error.context is a Response object, try to extract details
-      if (error.context && typeof error.context === 'object') {
-        try {
-          if (error.context instanceof Response) {
-            const responseText = await error.context.text();
-            try {
-              const responseJson = JSON.parse(responseText);
-              errorMsg = responseJson.error || responseJson.message || `${error.context.status} ${error.context.statusText}`;
-            } catch {
-              errorMsg = `${error.context.status} ${error.context.statusText}: ${responseText}`;
-            }
-          } else if (error.context.error) {
-            errorMsg = error.context.error;
-          }
-        } catch (e) {
-          console.error('Failed to parse error context:', e);
-        }
-      }
-      toast({
-        title: "Synkroniseringsfel",
-        description: errorMsg,
-        variant: "destructive"
-      });
-      console.error('Sync error details:', error);
-    } finally {
-      setSyncing(prev => ({
-        ...prev,
-        [syncType]: false
-      }));
-    }
-  };
   const retryFailedSync = async (failure: any) => {
     if (!failure.product_id) {
       toast({
@@ -181,9 +85,8 @@ const Integrations = () => {
         description: `Lagersaldo för ${failure.product_name} har uppdaterats i Sellus`
       });
 
-      // Refresh data
+      // Refresh sync failures
       setTimeout(() => {
-        fetchData();
         refetchFailures();
       }, 1000);
     } catch (error: any) {
@@ -199,55 +102,7 @@ const Integrations = () => {
       }));
     }
   };
-  const resolveAllItemIds = async () => {
-    setSyncing(prev => ({
-      ...prev,
-      'resolve-ids': true
-    }));
-    try {
-      const {
-        data,
-        error
-      } = await supabase.functions.invoke('resolve-sellus-item-ids', {
-        body: {}
-      });
-      if (error) throw error;
-      toast({
-        title: "Verifiering slutförd",
-        description: `${data.resolved} artiklar verifierade, ${data.failed} misslyckades`
-      });
-      setTimeout(fetchData, 1000);
-    } catch (error: any) {
-      toast({
-        title: "Fel vid verifiering",
-        description: error.message,
-        variant: "destructive"
-      });
-    } finally {
-      setSyncing(prev => ({
-        ...prev,
-        'resolve-ids': false
-      }));
-    }
-  };
-  const getSyncTypeLabel = (type: string) => {
-    const labels: Record<string, string> = {
-      'product_import': 'Artiklar',
-      'inventory_export': 'Lagersaldo till Sellus',
-      'sale_import': 'Försäljning'
-    };
-    return labels[type] || type;
-  };
-  const getStatusColor = (status: SyncStatus) => {
-    if (!status.last_successful_sync) return 'secondary';
-    const hoursSinceSync = (Date.now() - new Date(status.last_successful_sync).getTime()) / (1000 * 60 * 60);
-    if (status.total_errors > 0) return 'destructive';
-    if (hoursSinceSync > 24) return 'secondary';
-    return 'default';
-  };
-  if (loading) {
-    return <div className="w-full max-w-full px-4 py-6">Laddar...</div>;
-  }
+
   return <div className="w-full max-w-full px-4 py-6 md:container md:mx-auto md:px-6 space-y-6">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
@@ -255,9 +110,6 @@ const Integrations = () => {
           
         </div>
         <div className="flex flex-wrap gap-2 items-center justify-end">
-          <Button onClick={fetchData} variant="outline" size="icon">
-            <RefreshCw className="h-4 w-4" />
-          </Button>
           <ProfileButton />
         </div>
       </div>
