@@ -12,6 +12,7 @@ import ArticlesPage from "./pages/ArticlesPage";
 import SalesPage from "./pages/SalesPage";
 import OrderDetailPage from "./pages/OrderDetailPage";
 import FDTExplorer from "./pages/FDTExplorer";
+import GeminiDiagnostics from "./pages/GeminiDiagnostics";
 import DeliveryNotes from "./pages/DeliveryNotes";
 import DeliveryNoteDetail from "./pages/DeliveryNoteDetail";
 import DeliveryNoteScan from "./pages/DeliveryNoteScan";
@@ -35,6 +36,7 @@ const App = () => (
           <Route path="/sales" element={<SalesPage />} />
           <Route path="/sales/:orderId" element={<OrderDetailPage />} />
           <Route path="/fdt-explorer" element={<FDTExplorer />} />
+          <Route path="/gemini-diagnostics" element={<GeminiDiagnostics />} />
           <Route path="/delivery-notes" element={<DeliveryNotes />} />
           <Route path="/delivery-notes/:id" element={<DeliveryNoteDetail />} />
           <Route path="/delivery-notes/scan" element={<DeliveryNoteScan />} />

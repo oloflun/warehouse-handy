@@ -34,80 +34,148 @@ serve(async (req) => {
       tests: {} as any
     };
 
-    // Test: Check if Gemini API is accessible
+    // Test: Check if Gemini API is accessible with multiple scenarios
     if (GOOGLE_AI_API_KEY) {
+      // Test 1: Text-only to verify API key works
       try {
-        console.log('Testing Gemini API connection...');
-        
-        // Test with a small image (1x1 pixel red square)
-        const testImageBase64 = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlbaWmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD3+iiigD//2Q==';
-        
-        const testResponse = await fetch(
+        console.log('Test 1: Basic API key validation...');
+        const textTest = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GOOGLE_AI_API_KEY}`,
           {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    {
-                      text: 'Describe this test image briefly.'
-                    },
-                    {
-                      inline_data: {
-                        mime_type: 'image/jpeg',
-                        data: testImageBase64
-                      }
-                    }
-                  ]
-                }
-              ],
-              generationConfig: {
-                temperature: 0.1,
-                maxOutputTokens: 100
-              }
+              contents: [{ parts: [{ text: 'Respond with only: OK' }] }],
+              generationConfig: { temperature: 0.1, maxOutputTokens: 10 }
             }),
           }
         );
 
-        if (!testResponse.ok) {
-          const errorText = await testResponse.text();
-          diagnostics.tests.geminiVisionAPI = {
+        if (!textTest.ok) {
+          const errorText = await textTest.text();
+          diagnostics.tests.apiKeyValidation = {
             success: false,
-            status: testResponse.status,
-            statusText: testResponse.statusText,
+            status: textTest.status,
             error: errorText,
-            message: testResponse.status === 401 
-              ? 'Invalid API key - Get a new one from https://aistudio.google.com/app/apikey'
-              : testResponse.status === 429
-              ? 'Rate limit exceeded - Wait a few minutes or upgrade your Gemini API quota'
-              : testResponse.status === 403
-              ? 'API key does not have permission - Check Gemini API is enabled'
-              : 'API error - Check Gemini API status'
+            message: textTest.status === 401 ? 'Invalid API key'
+              : textTest.status === 403 ? 'API key lacks permissions'
+              : textTest.status === 404 ? 'Model not found - gemini-2.0-flash-exp may not be available'
+              : 'API error'
           };
         } else {
-          const data = await testResponse.json();
-          const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          
-          diagnostics.tests.geminiVisionAPI = {
+          const data = await textTest.json();
+          diagnostics.tests.apiKeyValidation = {
             success: true,
-            status: testResponse.status,
-            responseReceived: !!content,
-            response: content || 'NO CONTENT',
-            note: '✅ Gemini Vision API is working! Scanning should work.'
+            note: '✅ API key is valid and working'
           };
         }
-        
       } catch (error) {
-        diagnostics.tests.geminiVisionAPI = {
+        diagnostics.tests.apiKeyValidation = {
           success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-          type: 'Network or API error'
+          error: error instanceof Error ? error.message : 'Unknown error'
         };
       }
+
+      // Test 2: Vision API with simple image
+      try {
+        console.log('Test 2: Vision API with test image...');
+        // 1x1 red pixel JPEG
+        const testImageBase64 = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlbaWmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD3+iiigD//2Q==';
+        
+        const visionTest = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GOOGLE_AI_API_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { text: 'What color is this image?' },
+                  { inline_data: { mime_type: 'image/jpeg', data: testImageBase64 } }
+                ]
+              }],
+              generationConfig: { temperature: 0.1, maxOutputTokens: 50 }
+            }),
+          }
+        );
+
+        if (!visionTest.ok) {
+          const errorText = await visionTest.text();
+          diagnostics.tests.visionAPI = {
+            success: false,
+            status: visionTest.status,
+            error: errorText
+          };
+        } else {
+          const data = await visionTest.json();
+          const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          const finishReason = data.candidates?.[0]?.finishReason;
+          
+          diagnostics.tests.visionAPI = {
+            success: true,
+            response: content || 'NO CONTENT',
+            finishReason,
+            rawResponse: data,
+            note: content ? '✅ Vision API working' : '⚠️ API responded but no content'
+          };
+        }
+      } catch (error) {
+        diagnostics.tests.visionAPI = {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+
+      // Test 3: JSON response format (like actual scanning)
+      try {
+        console.log('Test 3: JSON response format test...');
+        const jsonTest = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GOOGLE_AI_API_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{
+                  text: `Return ONLY valid JSON (no markdown): {"test": "value", "numbers": [1, 2, 3]}`
+                }]
+              }],
+              generationConfig: { temperature: 0.1, maxOutputTokens: 100 }
+            }),
+          }
+        );
+
+        if (jsonTest.ok) {
+          const data = await jsonTest.json();
+          const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          
+          if (content) {
+            try {
+              // Try to parse as JSON (removing markdown if present)
+              const cleanContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+              const parsed = JSON.parse(cleanContent);
+              diagnostics.tests.jsonFormatTest = {
+                success: true,
+                note: '✅ Gemini returns parseable JSON',
+                parsed
+              };
+            } catch (parseError) {
+              diagnostics.tests.jsonFormatTest = {
+                success: false,
+                note: '⚠️ Gemini response not valid JSON',
+                rawResponse: content,
+                error: parseError instanceof Error ? parseError.message : 'Parse error'
+              };
+            }
+          }
+        }
+      } catch (error) {
+        diagnostics.tests.jsonFormatTest = {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    }
     } else {
       diagnostics.tests.geminiVisionAPI = {
         success: false,
