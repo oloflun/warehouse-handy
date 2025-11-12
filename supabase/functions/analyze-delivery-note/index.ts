@@ -18,10 +18,13 @@ serve(async (req) => {
     if (!imageData) {
       return new Response(
         JSON.stringify({ 
-          error: 'No image data provided'
+          error: 'No image data provided',
+          deliveryNoteNumber: '',
+          cargoMarking: null,
+          items: []
         }),
         { 
-          status: 400,
+          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
@@ -31,10 +34,13 @@ serve(async (req) => {
     if (!GOOGLE_AI_API_KEY) {
       return new Response(
         JSON.stringify({ 
-          error: 'GOOGLE_AI_API_KEY not configured. Please add it to Supabase Edge Function environment variables.'
+          error: 'GOOGLE_AI_API_KEY not configured. Please add it to Supabase Edge Function environment variables.',
+          deliveryNoteNumber: '',
+          cargoMarking: null,
+          items: []
         }),
         { 
-          status: 500,
+          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
@@ -125,10 +131,13 @@ ACCURACY IS CRITICAL. If unclear, return null for that field.`;
       return new Response(
         JSON.stringify({ 
           error: `Gemini API error: ${response.status}`,
-          details: errorText
+          details: errorText,
+          deliveryNoteNumber: '',
+          cargoMarking: null,
+          items: []
         }),
         { 
-          status: 502,
+          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
@@ -140,10 +149,13 @@ ACCURACY IS CRITICAL. If unclear, return null for that field.`;
     if (!content) {
       return new Response(
         JSON.stringify({ 
-          error: 'No response from Gemini API'
+          error: 'No response from Gemini API',
+          deliveryNoteNumber: '',
+          cargoMarking: null,
+          items: []
         }),
         { 
-          status: 502,
+          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
@@ -160,10 +172,13 @@ ACCURACY IS CRITICAL. If unclear, return null for that field.`;
       return new Response(
         JSON.stringify({ 
           error: 'Failed to parse response as JSON',
-          details: content
+          details: content,
+          deliveryNoteNumber: '',
+          cargoMarking: null,
+          items: []
         }),
         { 
-          status: 502,
+          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
@@ -174,10 +189,13 @@ ACCURACY IS CRITICAL. If unclear, return null for that field.`;
       return new Response(
         JSON.stringify({ 
           error: 'Invalid response structure',
-          details: 'Missing deliveryNoteNumber or items array'
+          details: 'Missing deliveryNoteNumber or items array',
+          deliveryNoteNumber: '',
+          cargoMarking: null,
+          items: []
         }),
         { 
-          status: 502,
+          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
@@ -197,14 +215,17 @@ ACCURACY IS CRITICAL. If unclear, return null for that field.`;
     const elapsed = Date.now() - startTime;
     console.error(`❌ Error in analyze-delivery-note after ${elapsed}ms:`, error);
     
-    // Return 500 for server-side errors
+    // Always return 200 with error details in body
     return new Response(
       JSON.stringify({ 
         error: error instanceof Error ? error.message : 'Unknown error',
-        details: error instanceof Error ? error.stack : undefined
+        details: error instanceof Error ? error.stack : undefined,
+        deliveryNoteNumber: '',
+        cargoMarking: null,
+        items: []
       }),
       { 
-        status: 500,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );

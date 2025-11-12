@@ -153,5 +153,6 @@ rules:
   - "Create comprehensive documentation for all features"
   - "FDT Sellus API uses POST for data updates, not PUT - verify with Swagger UI"
   - "Base URL must include https:// protocol - missing it breaks all API calls"
+  - "CRITICAL: Edge functions MUST return 200 OK status (never 4xx/5xx) - see EDGE_FUNCTION_STATUS_CODE_FIX.md"
   - "Update this agent config and copilot-instructions.md with important findings when PRs are merged"
 ---
