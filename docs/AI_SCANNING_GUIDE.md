@@ -14,15 +14,15 @@ For scanning to work, you **must** configure the Google Gemini API key in your S
 1. Go to Supabase Dashboard → Project Settings → Edge Functions → Environment Variables
 2. Add:
    ```
-   GOOGLE_AI_API_KEY=your-google-ai-api-key-here
+   GEMINI_API_KEY=your-google-ai-api-key-here
    ```
 
 **Detailed Setup Instructions:**
 See the complete guide: [GEMINI_API_SETUP.md](GEMINI_API_SETUP.md)
 
 **Without this configuration:**
-- Delivery note scanning will fail with error: "GOOGLE_AI_API_KEY not configured"
-- Label scanning will fail with error: "GOOGLE_AI_API_KEY is not configured"
+- Delivery note scanning will fail with error: "GEMINI_API_KEY not configured"
+- Label scanning will fail with error: "GEMINI_API_KEY is not configured"
 - All scanning features will be unavailable
 
 ### Technology Details
@@ -112,11 +112,11 @@ The system reports confidence in its readings:
 
 ## Common Issues & Solutions
 
-### Issue 0: "GOOGLE_AI_API_KEY not configured"
+### Issue 0: "GEMINI_API_KEY not configured"
 
 **Symptoms:**
 - Scanning immediately fails with configuration error
-- Error message: "GOOGLE_AI_API_KEY not configured" or "GOOGLE_AI_API_KEY is not configured"
+- Error message: "GEMINI_API_KEY not configured" or "GEMINI_API_KEY is not configured"
 - No image analysis happens
 
 **Cause:**
@@ -128,7 +128,7 @@ The system reports confidence in its readings:
    - Go to Google AI Studio: https://aistudio.google.com/app/apikey
    - Create/copy your API key
    - Add to Supabase: Settings → Edge Functions → Environment Variables
-   - Name: `GOOGLE_AI_API_KEY`
+   - Name: `GEMINI_API_KEY`
    - Value: Your API key (starts with `AIza`)
    - Wait 2-5 minutes or restart edge functions
 3. Verify setup by testing a scan
