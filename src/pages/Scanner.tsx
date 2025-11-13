@@ -366,18 +366,27 @@ const Scanner = () => {
       
       if (error) throw error;
       
+      const processingTime = Date.now() - analysisStartTime;
       setAiResults(data);
+      
+      // Track scan stats
+      setLastScanStats({
+        provider: data.provider || aiProvider,
+        model: data.model || aiModel,
+        processingTime: data.processingTime || processingTime,
+        success: true,
+      });
       
       // Show confidence and warnings to user
       if (data.confidence === 'low') {
         toast.warning("⚠️ Låg läsbarhet - kontrollera resultatet noga", {
           id: toastId,
-          duration: 3000 // Reduced from 4000
+          duration: 3000
         });
       } else if (data.confidence === 'medium') {
         toast.info("ℹ️ Medelhög läsbarhet - verifiera artikelnummer", {
           id: toastId,
-          duration: 2000 // Reduced from 3000
+          duration: 2000
         });
       }
       
@@ -397,6 +406,15 @@ const Scanner = () => {
           return await analyzeLabel(imageBase64, retryCount + 1);
         }
         
+        // Track failed scan
+        setLastScanStats({
+          provider: data.provider || aiProvider,
+          model: data.model || aiModel,
+          processingTime: data.processingTime || processingTime,
+          success: false,
+          error: "Inga resultat hittades"
+        });
+        
         toast.error("Kunde inte hitta några artikelnummer eller produktnamn. Försök ta en tydligare bild.", {
           id: toastId,
           duration: 4000
@@ -407,12 +425,25 @@ const Scanner = () => {
       toast.dismiss(toastId);
       console.log(`✅ Hittade ${data.article_numbers.length} artikelnummer och ${data.product_names.length} produktnamn`);
       console.log(`📊 Tillförlitlighet: ${data.confidence}`);
+      console.log(`⏱️ Tid: ${processingTime}ms med ${providerDisplay}`);
       
       // Auto-match against products
       await matchProductsFromAnalysis(data);
       
     } catch (err) {
       console.error("Analys misslyckades:", err);
+      
+      const processingTime = Date.now() - analysisStartTime;
+      const errorMsg = err instanceof Error ? err.message : "Kunde inte analysera etikett";
+      
+      // Track failed scan with error
+      setLastScanStats({
+        provider: aiProvider,
+        model: aiModel,
+        processingTime,
+        success: false,
+        error: errorMsg
+      });
       
       // Retry on timeout or network errors
       if (retryCount < maxRetries && err instanceof Error && 
@@ -425,10 +456,19 @@ const Scanner = () => {
         return await analyzeLabel(imageBase64, retryCount + 1);
       }
       
-      const errorMsg = err instanceof Error ? err.message : "Kunde inte analysera etikett";
-      toast.error(errorMsg + ". Ta en ny bild eller ange artikelnummer manuellt.", { 
+      // Show helpful error with troubleshooting tips
+      let troubleshootingTip = "";
+      if (errorMsg.includes("rate limit") || errorMsg.includes("429")) {
+        troubleshootingTip = " 💡 Tips: Prova att byta till annan modell eller vänta några minuter.";
+      } else if (errorMsg.includes("Timeout")) {
+        troubleshootingTip = " 💡 Tips: Prova en snabbare modell eller bättre belysning.";
+      } else if (errorMsg.includes("not configured")) {
+        troubleshootingTip = " 💡 Tips: Kontrollera API-nycklar i Admin Tools → Diagnostik.";
+      }
+      
+      toast.error(errorMsg + troubleshootingTip + " Eller ange artikelnummer manuellt.", { 
         id: toastId,
-        duration: 5000
+        duration: 7000
       });
     } finally {
       setIsAnalyzing(false);
@@ -1129,6 +1169,112 @@ const Scanner = () => {
           )}
           
           <div id="reader" className="w-full"></div>
+
+          {/* AI Provider and Model Selection */}
+          {cameraStarted && (
+            <Card className="bg-muted/50">
+              <CardContent className="pt-4 space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="ai-provider" className="text-sm font-semibold">
+                    Analysmodell
+                  </Label>
+                  <Select 
+                    value={aiProvider} 
+                    onValueChange={(value: "gemini" | "openai") => setAiProvider(value)}
+                    disabled={isAnalyzing}
+                  >
+                    <SelectTrigger id="ai-provider">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="gemini">
+                        <div className="flex items-center gap-2">
+                          <span className="text-purple-500">●</span>
+                          <span>Gemini (Google)</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="openai">
+                        <div className="flex items-center gap-2">
+                          <span className="text-orange-500">●</span>
+                          <span>OpenAI (GPT-4)</span>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="ai-model" className="text-sm">
+                    Modell
+                  </Label>
+                  <Select 
+                    value={aiModel} 
+                    onValueChange={setAiModel}
+                    disabled={isAnalyzing}
+                  >
+                    <SelectTrigger id="ai-model">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {aiProvider === "gemini" ? (
+                        <>
+                          <SelectItem value="gemini-2.0-flash-exp">
+                            gemini-2.0-flash-exp (Snabb)
+                          </SelectItem>
+                          <SelectItem value="gemini-1.5-flash">
+                            gemini-1.5-flash (Stabil)
+                          </SelectItem>
+                          <SelectItem value="gemini-1.5-pro">
+                            gemini-1.5-pro (Bäst kvalitet)
+                          </SelectItem>
+                        </>
+                      ) : (
+                        <>
+                          <SelectItem value="gpt-4o-mini">
+                            gpt-4o-mini (Snabb & billig)
+                          </SelectItem>
+                          <SelectItem value="gpt-4o">
+                            gpt-4o (Balanserad)
+                          </SelectItem>
+                          <SelectItem value="gpt-4-vision-preview">
+                            gpt-4-vision-preview (Bäst kvalitet)
+                          </SelectItem>
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {lastScanStats && (
+                  <div className="text-xs text-muted-foreground pt-2 border-t">
+                    <div className="flex justify-between">
+                      <span>Senaste scan:</span>
+                      <span className={lastScanStats.success ? "text-green-600" : "text-red-600"}>
+                        {lastScanStats.success ? "✓ Lyckades" : "✗ Misslyckades"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Provider:</span>
+                      <span className="font-mono">{lastScanStats.provider}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Modell:</span>
+                      <span className="font-mono text-xs">{lastScanStats.model}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Tid:</span>
+                      <span>{lastScanStats.processingTime}ms</span>
+                    </div>
+                    {lastScanStats.error && (
+                      <div className="mt-1 p-2 bg-destructive/10 rounded text-destructive">
+                        {lastScanStats.error}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Manual search always visible */}
           <div className="space-y-3">
