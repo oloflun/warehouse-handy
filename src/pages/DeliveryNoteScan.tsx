@@ -235,6 +235,9 @@ export default function DeliveryNoteScan() {
       ctx.drawImage(videoRef.current, 0, 0, targetWidth, targetHeight);
       const imageData = canvas.toDataURL('image/jpeg', 0.80); // Reduced from 0.85 for speed
 
+      // Freeze the camera view by pausing the video
+      videoRef.current.pause();
+
       if (scanMode === 'delivery-note') {
         console.log('Analyzing delivery note...');
         
@@ -287,8 +290,18 @@ export default function DeliveryNoteScan() {
         description: `${errorMessage}. Tips: Se till att bilden är skarp och välbelyst. Försök igen.`,
         variant: "destructive",
       });
+      
+      // Resume video on error
+      if (videoRef.current) {
+        videoRef.current.play().catch(console.error);
+      }
     } finally {
       setAnalyzing(false);
+      
+      // Resume video stream after analysis completes (if camera not stopped)
+      if (videoRef.current && cameraActive) {
+        videoRef.current.play().catch(console.error);
+      }
     }
   };
 

@@ -32,15 +32,23 @@ const Scanner = () => {
   const [pickingMode, setPickingMode] = useState(false);
   const [manualPickQuantity, setManualPickQuantity] = useState<number | null>(null);
   
-  // AI scanning state
+  // Scanning state
   const [scanMode, setScanMode] = useState<"barcode" | "ai">("ai");
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiResults, setAiResults] = useState<any>(null);
   const [matchedProducts, setMatchedProducts] = useState<any[]>([]);
-  const [autoScanInterval, setAutoScanInterval] = useState<NodeJS.Timeout | null>(null);
-  const [autoScanEnabled, setAutoScanEnabled] = useState(false);
-  const autoScanDelayMs = 2000; // 2 seconds between automatic scans
+  
+  // AI Provider and Model Selection
+  const [aiProvider, setAiProvider] = useState<"gemini" | "openai">("gemini");
+  const [aiModel, setAiModel] = useState<string>("gemini-2.0-flash-exp");
+  const [lastScanStats, setLastScanStats] = useState<{
+    provider: string;
+    model: string;
+    processingTime: number;
+    success: boolean;
+    error?: string;
+  } | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -54,13 +62,17 @@ const Scanner = () => {
     fetchLocations();
   }, [navigate]);
 
+  // Update model when provider changes
+  useEffect(() => {
+    if (aiProvider === "gemini") {
+      setAiModel("gemini-2.0-flash-exp");
+    } else if (aiProvider === "openai") {
+      setAiModel("gpt-4o-mini");
+    }
+  }, [aiProvider]);
+
   useEffect(() => {
     return () => {
-      // Stop automatic scanning
-      if (autoScanInterval) {
-        clearInterval(autoScanInterval);
-      }
-      
       // Stop camera on unmount - check if scanner is actually running first
       if (html5QrCodeRef.current) {
         try {
@@ -75,7 +87,7 @@ const Scanner = () => {
         }
       }
     };
-  }, [autoScanInterval]);
+  }, []);
 
   // Auto-start camera when component mounts and user is authenticated
   useEffect(() => {
@@ -215,13 +227,6 @@ const Scanner = () => {
     if (!html5QrCodeRef.current) return;
     
     try {
-      // Stop automatic scanning
-      if (autoScanInterval) {
-        clearInterval(autoScanInterval);
-        setAutoScanInterval(null);
-      }
-      setAutoScanEnabled(false);
-      
       // Check if scanner is actually running before trying to stop it
       const state = html5QrCodeRef.current.getState();
       // State 2 = SCANNING, State 3 = PAUSED
@@ -241,45 +246,7 @@ const Scanner = () => {
     }
   };
 
-  const toggleAutoScan = () => {
-    if (!cameraStarted) {
-      toast.error("Starta kameran först");
-      return;
-    }
-
-    if (autoScanEnabled) {
-      // Disable auto-scan
-      if (autoScanInterval) {
-        clearInterval(autoScanInterval);
-        setAutoScanInterval(null);
-      }
-      setAutoScanEnabled(false);
-      toast.info("Automatisk scanning avstängd");
-    } else {
-      // Enable auto-scan
-      setAutoScanEnabled(true);
-      toast.success(`Automatisk scanning påslagen (var ${autoScanDelayMs / 1000}:e sekund)`);
-      
-      // Start the automatic scanning interval
-      const interval = setInterval(() => {
-        // Only capture if not currently analyzing
-        if (!isAnalyzing && cameraStarted) {
-          captureImage();
-        }
-      }, autoScanDelayMs);
-      
-      setAutoScanInterval(interval);
-    }
-  };
-
   const resetScanner = () => {
-    // Stop automatic scanning
-    if (autoScanInterval) {
-      clearInterval(autoScanInterval);
-      setAutoScanInterval(null);
-    }
-    setAutoScanEnabled(false);
-    
     setProduct(null);
     setActiveOrders([]);
     setSelectedOrder(null);
@@ -302,7 +269,7 @@ const Scanner = () => {
     
     try {
       // Get video element from the reader
-      const videoElement = document.getElementById("reader")?.querySelector("video");
+      const videoElement = document.getElementById("reader")?.querySelector("video") as HTMLVideoElement;
       if (!videoElement) {
         toast.error("Kunde inte hitta video-element");
         return;
@@ -333,73 +300,98 @@ const Scanner = () => {
       const imageBase64 = canvas.toDataURL("image/jpeg", 0.80);
       setCapturedImage(imageBase64);
       
-      // Visual feedback - shorter duration for speed
-      if (!autoScanEnabled) {
-        toast.success("Bild tagen! Analyserar...", { duration: 500 });
-      }
+      // Freeze the camera view by pausing the video
+      videoElement.pause();
       
-      // Analyze with AI
+      // Visual feedback
+      toast.success("Bild tagen! Analyserar...", { duration: 500 });
+      
+      // Analyze label
       await analyzeLabel(imageBase64);
     } catch (err) {
       console.error("Kunde inte ta foto:", err);
       toast.error("Kunde inte ta foto. Försök igen.");
+      
+      // Resume video on error
+      const videoElement = document.getElementById("reader")?.querySelector("video") as HTMLVideoElement;
+      if (videoElement) {
+        videoElement.play().catch(console.error);
+      }
     }
   };
 
   const analyzeLabel = async (imageBase64: string, retryCount = 0) => {
-    // Skippa om redan en analys är i gång MED samma bild
+    // Skip if already analyzing
     if (isAnalyzing) {
       return;
     }
     
     setIsAnalyzing(true);
-    const maxRetries = 1; // Reduced from 2 for speed
+    const maxRetries = 1;
     const attempt = retryCount + 1;
-    const toastId = "ai-analysis";
+    const toastId = "label-analysis";
+    const analysisStartTime = Date.now();
     
-    // Only show toast for manual scans or first auto-scan
-    if (!autoScanEnabled || attempt === 1) {
-      toast.loading(
-        attempt > 1 
-          ? `Analyserar etikett... (försök ${attempt}/${maxRetries + 1})` 
-          : "Analyserar etikett...", 
-        { id: toastId }
-      );
-    }
+    // Show provider and model in loading message
+    const providerDisplay = aiProvider === "gemini" ? "Gemini" : "OpenAI";
+    const modelDisplay = aiModel;
+    
+    toast.loading(
+      attempt > 1 
+        ? `Analyserar etikett... (försök ${attempt}/${maxRetries + 1}) - ${providerDisplay}` 
+        : `Analyserar etikett med ${providerDisplay} (${modelDisplay})...`, 
+      { id: toastId }
+    );
     
     try {
-      // Reduced timeout to 8 seconds for faster response (from 10)
+      // Reduced timeout to 15 seconds for OpenAI (GPT-4 can be slower)
+      const timeoutMs = aiProvider === "openai" ? 15000 : 8000;
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Timeout - försök igen")), 8000)
+        setTimeout(() => reject(new Error(`Timeout efter ${timeoutMs/1000}s - försök igen eller byt modell`)), timeoutMs)
       );
       
-      const analysisPromise = supabase.functions.invoke("analyze-label", {
-        body: { image: imageBase64 }
+      // Choose function based on provider
+      const functionName = aiProvider === "openai" ? "analyze-label-openai" : "analyze-label";
+      const requestBody = aiProvider === "openai" 
+        ? { image: imageBase64, model: aiModel }
+        : { image: imageBase64 };
+      
+      console.log(`🔍 Analyzing with ${providerDisplay} (${modelDisplay})...`);
+      
+      const analysisPromise = supabase.functions.invoke(functionName, {
+        body: requestBody
       });
       
       const { data, error } = await Promise.race([analysisPromise, timeoutPromise]) as any;
       
       if (error) throw error;
       
+      const processingTime = Date.now() - analysisStartTime;
       setAiResults(data);
       
-      // Show confidence and warnings to user (only for manual scans)
-      if (!autoScanEnabled) {
-        if (data.confidence === 'low') {
-          toast.warning("⚠️ Låg läsbarhet - kontrollera resultatet noga", {
-            id: toastId,
-            duration: 3000 // Reduced from 4000
-          });
-        } else if (data.confidence === 'medium') {
-          toast.info("ℹ️ Medelhög läsbarhet - verifiera artikelnummer", {
-            id: toastId,
-            duration: 2000 // Reduced from 3000
-          });
-        }
+      // Track scan stats
+      setLastScanStats({
+        provider: data.provider || aiProvider,
+        model: data.model || aiModel,
+        processingTime: data.processingTime || processingTime,
+        success: true,
+      });
+      
+      // Show confidence and warnings to user
+      if (data.confidence === 'low') {
+        toast.warning("⚠️ Låg läsbarhet - kontrollera resultatet noga", {
+          id: toastId,
+          duration: 3000
+        });
+      } else if (data.confidence === 'medium') {
+        toast.info("ℹ️ Medelhög läsbarhet - verifiera artikelnummer", {
+          id: toastId,
+          duration: 2000
+        });
       }
       
       if (data.warnings && data.warnings.length > 0) {
-        console.log("AI varningar:", data.warnings);
+        console.log("Varningar:", data.warnings);
       }
       
       if (data.article_numbers.length === 0 && data.product_names.length === 0) {
@@ -414,24 +406,44 @@ const Scanner = () => {
           return await analyzeLabel(imageBase64, retryCount + 1);
         }
         
-        if (!autoScanEnabled) {
-          toast.error("Kunde inte hitta några artikelnummer eller produktnamn. Försök ta en tydligare bild.", {
-            id: toastId,
-            duration: 4000
-          });
-        }
+        // Track failed scan
+        setLastScanStats({
+          provider: data.provider || aiProvider,
+          model: data.model || aiModel,
+          processingTime: data.processingTime || processingTime,
+          success: false,
+          error: "Inga resultat hittades"
+        });
+        
+        toast.error("Kunde inte hitta några artikelnummer eller produktnamn. Försök ta en tydligare bild.", {
+          id: toastId,
+          duration: 4000
+        });
         return;
       }
       
       toast.dismiss(toastId);
-      console.log(`✅ AI hittade ${data.article_numbers.length} artikelnummer och ${data.product_names.length} produktnamn`);
+      console.log(`✅ Hittade ${data.article_numbers.length} artikelnummer och ${data.product_names.length} produktnamn`);
       console.log(`📊 Tillförlitlighet: ${data.confidence}`);
+      console.log(`⏱️ Tid: ${processingTime}ms med ${providerDisplay}`);
       
       // Auto-match against products
-      await matchProductsFromAI(data);
+      await matchProductsFromAnalysis(data);
       
     } catch (err) {
-      console.error("AI-analys misslyckades:", err);
+      console.error("Analys misslyckades:", err);
+      
+      const processingTime = Date.now() - analysisStartTime;
+      const errorMsg = err instanceof Error ? err.message : "Kunde inte analysera etikett";
+      
+      // Track failed scan with error
+      setLastScanStats({
+        provider: aiProvider,
+        model: aiModel,
+        processingTime,
+        success: false,
+        error: errorMsg
+      });
       
       // Retry on timeout or network errors
       if (retryCount < maxRetries && err instanceof Error && 
@@ -444,25 +456,36 @@ const Scanner = () => {
         return await analyzeLabel(imageBase64, retryCount + 1);
       }
       
-      if (!autoScanEnabled) {
-        const errorMsg = err instanceof Error ? err.message : "Kunde inte analysera etikett";
-        toast.error(errorMsg + ". Ta en ny bild eller ange artikelnummer manuellt.", { 
-          id: toastId,
-          duration: 5000
-        });
+      // Show helpful error with troubleshooting tips
+      let troubleshootingTip = "";
+      if (errorMsg.includes("rate limit") || errorMsg.includes("429")) {
+        troubleshootingTip = " 💡 Tips: Prova att byta till annan modell eller vänta några minuter.";
+      } else if (errorMsg.includes("Timeout")) {
+        troubleshootingTip = " 💡 Tips: Prova en snabbare modell eller bättre belysning.";
+      } else if (errorMsg.includes("not configured")) {
+        troubleshootingTip = " 💡 Tips: Kontrollera API-nycklar i Admin Tools → Diagnostik.";
       }
+      
+      toast.error(errorMsg + troubleshootingTip + " Eller ange artikelnummer manuellt.", { 
+        id: toastId,
+        duration: 7000
+      });
     } finally {
       setIsAnalyzing(false);
+      
+      // Resume video stream after analysis completes
+      const videoElement = document.getElementById("reader")?.querySelector("video") as HTMLVideoElement;
+      if (videoElement) {
+        videoElement.play().catch(console.error);
+      }
     }
   };
 
-  const matchProductsFromAI = async (aiData: any) => {
-    const { article_numbers, product_names } = aiData;
+  const matchProductsFromAnalysis = async (analysisData: any) => {
+    const { article_numbers, product_names } = analysisData;
     
     if (article_numbers.length === 0 && product_names.length === 0) {
-      if (!autoScanEnabled) {
-        toast.warning("Inga artikelnummer eller produktnamn att söka efter");
-      }
+      toast.warning("Inga artikelnummer eller produktnamn att söka efter");
       return;
     }
     
@@ -501,21 +524,9 @@ const Scanner = () => {
     }
     
     if (matchedProds.length === 0) {
-      if (!autoScanEnabled) {
-        toast.warning("Kunde inte hitta några matchande produkter i systemet");
-      }
+      toast.warning("Kunde inte hitta några matchande produkter i systemet");
       setMatchedProducts([]);
       return;
-    }
-    
-    // Stop automatic scanning when products are found
-    if (autoScanEnabled && matchedProds.length > 0) {
-      if (autoScanInterval) {
-        clearInterval(autoScanInterval);
-        setAutoScanInterval(null);
-      }
-      setAutoScanEnabled(false);
-      toast.success("Automatisk scanning stoppad - produkt hittad!");
     }
     
     setMatchedProducts(matchedProds);
@@ -1159,6 +1170,112 @@ const Scanner = () => {
           
           <div id="reader" className="w-full"></div>
 
+          {/* AI Provider and Model Selection */}
+          {cameraStarted && (
+            <Card className="bg-muted/50">
+              <CardContent className="pt-4 space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="ai-provider" className="text-sm font-semibold">
+                    Analysmodell
+                  </Label>
+                  <Select 
+                    value={aiProvider} 
+                    onValueChange={(value: "gemini" | "openai") => setAiProvider(value)}
+                    disabled={isAnalyzing}
+                  >
+                    <SelectTrigger id="ai-provider">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="gemini">
+                        <div className="flex items-center gap-2">
+                          <span className="text-purple-500">●</span>
+                          <span>Gemini (Google)</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="openai">
+                        <div className="flex items-center gap-2">
+                          <span className="text-orange-500">●</span>
+                          <span>OpenAI (GPT-4)</span>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="ai-model" className="text-sm">
+                    Modell
+                  </Label>
+                  <Select 
+                    value={aiModel} 
+                    onValueChange={setAiModel}
+                    disabled={isAnalyzing}
+                  >
+                    <SelectTrigger id="ai-model">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {aiProvider === "gemini" ? (
+                        <>
+                          <SelectItem value="gemini-2.0-flash-exp">
+                            gemini-2.0-flash-exp (Snabb)
+                          </SelectItem>
+                          <SelectItem value="gemini-1.5-flash">
+                            gemini-1.5-flash (Stabil)
+                          </SelectItem>
+                          <SelectItem value="gemini-1.5-pro">
+                            gemini-1.5-pro (Bäst kvalitet)
+                          </SelectItem>
+                        </>
+                      ) : (
+                        <>
+                          <SelectItem value="gpt-4o-mini">
+                            gpt-4o-mini (Snabb & billig)
+                          </SelectItem>
+                          <SelectItem value="gpt-4o">
+                            gpt-4o (Balanserad)
+                          </SelectItem>
+                          <SelectItem value="gpt-4-vision-preview">
+                            gpt-4-vision-preview (Bäst kvalitet)
+                          </SelectItem>
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {lastScanStats && (
+                  <div className="text-xs text-muted-foreground pt-2 border-t">
+                    <div className="flex justify-between">
+                      <span>Senaste scan:</span>
+                      <span className={lastScanStats.success ? "text-green-600" : "text-red-600"}>
+                        {lastScanStats.success ? "✓ Lyckades" : "✗ Misslyckades"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Provider:</span>
+                      <span className="font-mono">{lastScanStats.provider}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Modell:</span>
+                      <span className="font-mono text-xs">{lastScanStats.model}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Tid:</span>
+                      <span>{lastScanStats.processingTime}ms</span>
+                    </div>
+                    {lastScanStats.error && (
+                      <div className="mt-1 p-2 bg-destructive/10 rounded text-destructive">
+                        {lastScanStats.error}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Manual search always visible */}
           <div className="space-y-3">
             {/* Camera capture button - only when camera started */}
@@ -1179,27 +1296,6 @@ const Scanner = () => {
                     <>
                       <Camera className="w-5 h-5 mr-2" />
                       Scanna
-                    </>
-                  )}
-                </Button>
-
-                {/* Auto-scan toggle button */}
-                <Button
-                  onClick={toggleAutoScan}
-                  disabled={isAnalyzing}
-                  variant={autoScanEnabled ? "default" : "outline"}
-                  size="default"
-                  className="w-full"
-                >
-                  {autoScanEnabled ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Auto-scan PÅ (var {autoScanDelayMs / 1000}s)
-                    </>
-                  ) : (
-                    <>
-                      <RotateCcw className="w-4 h-4 mr-2" />
-                      Aktivera Auto-scan
                     </>
                   )}
                 </Button>
