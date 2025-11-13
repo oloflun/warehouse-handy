@@ -220,17 +220,20 @@ export default function DeliveryNoteScan() {
     
     try {
       const canvas = document.createElement('canvas');
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
+      // Optimize resolution for faster processing (reduced from full resolution)
+      const targetWidth = Math.min(videoRef.current.videoWidth, 1280);
+      const targetHeight = Math.min(videoRef.current.videoHeight, 720);
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
       const ctx = canvas.getContext('2d');
       
       if (!ctx) throw new Error('Could not get canvas context');
       
-      // Use higher quality for better OCR
+      // Use medium quality for faster processing
       ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(videoRef.current, 0, 0);
-      const imageData = canvas.toDataURL('image/jpeg', 0.85);
+      ctx.imageSmoothingQuality = 'medium'; // Changed from 'high' for speed
+      ctx.drawImage(videoRef.current, 0, 0, targetWidth, targetHeight);
+      const imageData = canvas.toDataURL('image/jpeg', 0.80); // Reduced from 0.85 for speed
 
       if (scanMode === 'delivery-note') {
         console.log('Analyzing delivery note...');

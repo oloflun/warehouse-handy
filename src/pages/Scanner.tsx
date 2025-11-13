@@ -39,6 +39,8 @@ const Scanner = () => {
   const [aiResults, setAiResults] = useState<any>(null);
   const [matchedProducts, setMatchedProducts] = useState<any[]>([]);
   const [autoScanInterval, setAutoScanInterval] = useState<NodeJS.Timeout | null>(null);
+  const [autoScanEnabled, setAutoScanEnabled] = useState(false);
+  const autoScanDelayMs = 2000; // 2 seconds between automatic scans
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -199,7 +201,7 @@ const Scanner = () => {
       setCameraStarted(true);
       
       if (scanMode === "ai") {
-        toast.success("Kamera startad - tryck på knappen för att ta foto");
+        toast.success("Kamera startad - tryck på knappen för att scanna");
       } else {
         toast.success("Kamera startad - redo att scanna");
       }
@@ -218,6 +220,7 @@ const Scanner = () => {
         clearInterval(autoScanInterval);
         setAutoScanInterval(null);
       }
+      setAutoScanEnabled(false);
       
       // Check if scanner is actually running before trying to stop it
       const state = html5QrCodeRef.current.getState();
@@ -238,12 +241,44 @@ const Scanner = () => {
     }
   };
 
+  const toggleAutoScan = () => {
+    if (!cameraStarted) {
+      toast.error("Starta kameran först");
+      return;
+    }
+
+    if (autoScanEnabled) {
+      // Disable auto-scan
+      if (autoScanInterval) {
+        clearInterval(autoScanInterval);
+        setAutoScanInterval(null);
+      }
+      setAutoScanEnabled(false);
+      toast.info("Automatisk scanning avstängd");
+    } else {
+      // Enable auto-scan
+      setAutoScanEnabled(true);
+      toast.success(`Automatisk scanning påslagen (var ${autoScanDelayMs / 1000}:e sekund)`);
+      
+      // Start the automatic scanning interval
+      const interval = setInterval(() => {
+        // Only capture if not currently analyzing
+        if (!isAnalyzing && cameraStarted) {
+          captureImage();
+        }
+      }, autoScanDelayMs);
+      
+      setAutoScanInterval(interval);
+    }
+  };
+
   const resetScanner = () => {
     // Stop automatic scanning
     if (autoScanInterval) {
       clearInterval(autoScanInterval);
       setAutoScanInterval(null);
     }
+    setAutoScanEnabled(false);
     
     setProduct(null);
     setActiveOrders([]);
@@ -273,12 +308,12 @@ const Scanner = () => {
         return;
       }
       
-      // Create canvas and capture frame at higher resolution
+      // Create canvas and capture frame - optimized for speed
       const canvas = document.createElement("canvas");
       
-      // Use higher resolution for better OCR accuracy
-      const targetWidth = Math.min(videoElement.videoWidth, 1920);
-      const targetHeight = Math.min(videoElement.videoHeight, 1080);
+      // Use optimal resolution for fast OCR (not too high, not too low)
+      const targetWidth = Math.min(videoElement.videoWidth, 1280); // Reduced from 1920 for speed
+      const targetHeight = Math.min(videoElement.videoHeight, 720); // Reduced from 1080 for speed
       
       canvas.width = targetWidth;
       canvas.height = targetHeight;
@@ -289,17 +324,19 @@ const Scanner = () => {
         return;
       }
       
-      // Draw with higher quality
+      // Draw with good quality but optimize for speed
       ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
+      ctx.imageSmoothingQuality = 'medium'; // Changed from 'high' to 'medium' for speed
       ctx.drawImage(videoElement, 0, 0, targetWidth, targetHeight);
       
-      // Use 0.85 quality for better balance between speed and accuracy
-      const imageBase64 = canvas.toDataURL("image/jpeg", 0.85);
+      // Use 0.80 quality for better speed (reduced from 0.85)
+      const imageBase64 = canvas.toDataURL("image/jpeg", 0.80);
       setCapturedImage(imageBase64);
       
-      // Visual feedback
-      toast.success("Bild tagen! Analyserar...", { duration: 1000 });
+      // Visual feedback - shorter duration for speed
+      if (!autoScanEnabled) {
+        toast.success("Bild tagen! Analyserar...", { duration: 500 });
+      }
       
       // Analyze with AI
       await analyzeLabel(imageBase64);
@@ -316,21 +353,24 @@ const Scanner = () => {
     }
     
     setIsAnalyzing(true);
-    const maxRetries = 2;
+    const maxRetries = 1; // Reduced from 2 for speed
     const attempt = retryCount + 1;
     const toastId = "ai-analysis";
     
-    toast.loading(
-      attempt > 1 
-        ? `Analyserar etikett... (försök ${attempt}/${maxRetries + 1})` 
-        : "Analyserar etikett...", 
-      { id: toastId }
-    );
+    // Only show toast for manual scans or first auto-scan
+    if (!autoScanEnabled || attempt === 1) {
+      toast.loading(
+        attempt > 1 
+          ? `Analyserar etikett... (försök ${attempt}/${maxRetries + 1})` 
+          : "Analyserar etikett...", 
+        { id: toastId }
+      );
+    }
     
     try {
-      // Timeout på 10 sekunder för edge function
+      // Reduced timeout to 8 seconds for faster response (from 10)
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Timeout - försök igen")), 10000)
+        setTimeout(() => reject(new Error("Timeout - försök igen")), 8000)
       );
       
       const analysisPromise = supabase.functions.invoke("analyze-label", {
@@ -343,17 +383,19 @@ const Scanner = () => {
       
       setAiResults(data);
       
-      // Show confidence and warnings to user
-      if (data.confidence === 'low') {
-        toast.warning("⚠️ Låg läsbarhet - kontrollera resultatet noga", {
-          id: toastId,
-          duration: 4000
-        });
-      } else if (data.confidence === 'medium') {
-        toast.info("ℹ️ Medelhög läsbarhet - verifiera artikelnummer", {
-          id: toastId,
-          duration: 3000
-        });
+      // Show confidence and warnings to user (only for manual scans)
+      if (!autoScanEnabled) {
+        if (data.confidence === 'low') {
+          toast.warning("⚠️ Låg läsbarhet - kontrollera resultatet noga", {
+            id: toastId,
+            duration: 3000 // Reduced from 4000
+          });
+        } else if (data.confidence === 'medium') {
+          toast.info("ℹ️ Medelhög läsbarhet - verifiera artikelnummer", {
+            id: toastId,
+            duration: 2000 // Reduced from 3000
+          });
+        }
       }
       
       if (data.warnings && data.warnings.length > 0) {
@@ -367,15 +409,17 @@ const Scanner = () => {
           toast.dismiss(toastId);
           setIsAnalyzing(false);
           
-          // Wait a bit before retry
-          await new Promise(resolve => setTimeout(resolve, 500));
+          // Reduced wait time before retry
+          await new Promise(resolve => setTimeout(resolve, 300));
           return await analyzeLabel(imageBase64, retryCount + 1);
         }
         
-        toast.error("Kunde inte hitta några artikelnummer eller produktnamn. Försök ta en tydligare bild.", {
-          id: toastId,
-          duration: 5000
-        });
+        if (!autoScanEnabled) {
+          toast.error("Kunde inte hitta några artikelnummer eller produktnamn. Försök ta en tydligare bild.", {
+            id: toastId,
+            duration: 4000
+          });
+        }
         return;
       }
       
@@ -396,15 +440,17 @@ const Scanner = () => {
         toast.dismiss(toastId);
         setIsAnalyzing(false);
         
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 500));
         return await analyzeLabel(imageBase64, retryCount + 1);
       }
       
-      const errorMsg = err instanceof Error ? err.message : "Kunde inte analysera etikett";
-      toast.error(errorMsg + ". Ta en ny bild eller ange artikelnummer manuellt.", { 
-        id: toastId,
-        duration: 6000
-      });
+      if (!autoScanEnabled) {
+        const errorMsg = err instanceof Error ? err.message : "Kunde inte analysera etikett";
+        toast.error(errorMsg + ". Ta en ny bild eller ange artikelnummer manuellt.", { 
+          id: toastId,
+          duration: 5000
+        });
+      }
     } finally {
       setIsAnalyzing(false);
     }
@@ -414,7 +460,9 @@ const Scanner = () => {
     const { article_numbers, product_names } = aiData;
     
     if (article_numbers.length === 0 && product_names.length === 0) {
-      toast.warning("Inga artikelnummer eller produktnamn att söka efter");
+      if (!autoScanEnabled) {
+        toast.warning("Inga artikelnummer eller produktnamn att söka efter");
+      }
       return;
     }
     
@@ -453,9 +501,21 @@ const Scanner = () => {
     }
     
     if (matchedProds.length === 0) {
-      toast.warning("Kunde inte hitta några matchande produkter i systemet");
+      if (!autoScanEnabled) {
+        toast.warning("Kunde inte hitta några matchande produkter i systemet");
+      }
       setMatchedProducts([]);
       return;
+    }
+    
+    // Stop automatic scanning when products are found
+    if (autoScanEnabled && matchedProds.length > 0) {
+      if (autoScanInterval) {
+        clearInterval(autoScanInterval);
+        setAutoScanInterval(null);
+      }
+      setAutoScanEnabled(false);
+      toast.success("Automatisk scanning stoppad - produkt hittad!");
     }
     
     setMatchedProducts(matchedProds);
@@ -463,12 +523,6 @@ const Scanner = () => {
     // If only one product matched, auto-select it
     if (matchedProds.length === 1) {
       const product = matchedProds[0];
-      
-      // Stop automatic scanning when product is found
-      if (autoScanInterval) {
-        clearInterval(autoScanInterval);
-        setAutoScanInterval(null);
-      }
       
       setProduct(product);
       toast.success(`Produkt hittad: ${product.name}`);
@@ -1109,24 +1163,47 @@ const Scanner = () => {
           <div className="space-y-3">
             {/* Camera capture button - only when camera started */}
             {cameraStarted && (
-              <Button
-                onClick={captureImage}
-                disabled={isAnalyzing}
-                size="lg"
-                className="w-full h-14 bg-primary hover:bg-primary/90 disabled:opacity-50"
-              >
-                {isAnalyzing ? (
-                  <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Analyserar...
-                  </>
-                ) : (
-                  <>
-                    <Camera className="w-5 h-5 mr-2" />
-                    Scanna
-                  </>
-                )}
-              </Button>
+              <>
+                <Button
+                  onClick={captureImage}
+                  disabled={isAnalyzing}
+                  size="lg"
+                  className="w-full h-14 bg-primary hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {isAnalyzing ? (
+                    <>
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      Analyserar...
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="w-5 h-5 mr-2" />
+                      Scanna
+                    </>
+                  )}
+                </Button>
+
+                {/* Auto-scan toggle button */}
+                <Button
+                  onClick={toggleAutoScan}
+                  disabled={isAnalyzing}
+                  variant={autoScanEnabled ? "default" : "outline"}
+                  size="default"
+                  className="w-full"
+                >
+                  {autoScanEnabled ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Auto-scan PÅ (var {autoScanDelayMs / 1000}s)
+                    </>
+                  ) : (
+                    <>
+                      <RotateCcw className="w-4 h-4 mr-2" />
+                      Aktivera Auto-scan
+                    </>
+                  )}
+                </Button>
+              </>
             )}
 
             <div className="flex gap-2 items-end">
