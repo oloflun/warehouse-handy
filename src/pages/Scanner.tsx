@@ -38,6 +38,17 @@ const Scanner = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiResults, setAiResults] = useState<any>(null);
   const [matchedProducts, setMatchedProducts] = useState<any[]>([]);
+  
+  // AI Provider and Model Selection
+  const [aiProvider, setAiProvider] = useState<"gemini" | "openai">("gemini");
+  const [aiModel, setAiModel] = useState<string>("gemini-2.0-flash-exp");
+  const [lastScanStats, setLastScanStats] = useState<{
+    provider: string;
+    model: string;
+    processingTime: number;
+    success: boolean;
+    error?: string;
+  } | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -50,6 +61,15 @@ const Scanner = () => {
 
     fetchLocations();
   }, [navigate]);
+
+  // Update model when provider changes
+  useEffect(() => {
+    if (aiProvider === "gemini") {
+      setAiModel("gemini-2.0-flash-exp");
+    } else if (aiProvider === "openai") {
+      setAiModel("gpt-4o-mini");
+    }
+  }, [aiProvider]);
 
   useEffect(() => {
     return () => {
@@ -307,25 +327,39 @@ const Scanner = () => {
     }
     
     setIsAnalyzing(true);
-    const maxRetries = 1; // Reduced from 2 for speed
+    const maxRetries = 1;
     const attempt = retryCount + 1;
     const toastId = "label-analysis";
+    const analysisStartTime = Date.now();
+    
+    // Show provider and model in loading message
+    const providerDisplay = aiProvider === "gemini" ? "Gemini" : "OpenAI";
+    const modelDisplay = aiModel;
     
     toast.loading(
       attempt > 1 
-        ? `Analyserar etikett... (försök ${attempt}/${maxRetries + 1})` 
-        : "Analyserar etikett...", 
+        ? `Analyserar etikett... (försök ${attempt}/${maxRetries + 1}) - ${providerDisplay}` 
+        : `Analyserar etikett med ${providerDisplay} (${modelDisplay})...`, 
       { id: toastId }
     );
     
     try {
-      // Reduced timeout to 8 seconds for faster response (from 10)
+      // Reduced timeout to 15 seconds for OpenAI (GPT-4 can be slower)
+      const timeoutMs = aiProvider === "openai" ? 15000 : 8000;
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Timeout - försök igen")), 8000)
+        setTimeout(() => reject(new Error(`Timeout efter ${timeoutMs/1000}s - försök igen eller byt modell`)), timeoutMs)
       );
       
-      const analysisPromise = supabase.functions.invoke("analyze-label", {
-        body: { image: imageBase64 }
+      // Choose function based on provider
+      const functionName = aiProvider === "openai" ? "analyze-label-openai" : "analyze-label";
+      const requestBody = aiProvider === "openai" 
+        ? { image: imageBase64, model: aiModel }
+        : { image: imageBase64 };
+      
+      console.log(`🔍 Analyzing with ${providerDisplay} (${modelDisplay})...`);
+      
+      const analysisPromise = supabase.functions.invoke(functionName, {
+        body: requestBody
       });
       
       const { data, error } = await Promise.race([analysisPromise, timeoutPromise]) as any;
