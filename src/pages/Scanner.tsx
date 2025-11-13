@@ -32,15 +32,12 @@ const Scanner = () => {
   const [pickingMode, setPickingMode] = useState(false);
   const [manualPickQuantity, setManualPickQuantity] = useState<number | null>(null);
   
-  // AI scanning state
+  // Scanning state
   const [scanMode, setScanMode] = useState<"barcode" | "ai">("ai");
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiResults, setAiResults] = useState<any>(null);
   const [matchedProducts, setMatchedProducts] = useState<any[]>([]);
-  const [autoScanInterval, setAutoScanInterval] = useState<NodeJS.Timeout | null>(null);
-  const [autoScanEnabled, setAutoScanEnabled] = useState(false);
-  const autoScanDelayMs = 2000; // 2 seconds between automatic scans
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -56,11 +53,6 @@ const Scanner = () => {
 
   useEffect(() => {
     return () => {
-      // Stop automatic scanning
-      if (autoScanInterval) {
-        clearInterval(autoScanInterval);
-      }
-      
       // Stop camera on unmount - check if scanner is actually running first
       if (html5QrCodeRef.current) {
         try {
@@ -75,7 +67,7 @@ const Scanner = () => {
         }
       }
     };
-  }, [autoScanInterval]);
+  }, []);
 
   // Auto-start camera when component mounts and user is authenticated
   useEffect(() => {
@@ -215,13 +207,6 @@ const Scanner = () => {
     if (!html5QrCodeRef.current) return;
     
     try {
-      // Stop automatic scanning
-      if (autoScanInterval) {
-        clearInterval(autoScanInterval);
-        setAutoScanInterval(null);
-      }
-      setAutoScanEnabled(false);
-      
       // Check if scanner is actually running before trying to stop it
       const state = html5QrCodeRef.current.getState();
       // State 2 = SCANNING, State 3 = PAUSED
@@ -241,45 +226,7 @@ const Scanner = () => {
     }
   };
 
-  const toggleAutoScan = () => {
-    if (!cameraStarted) {
-      toast.error("Starta kameran först");
-      return;
-    }
-
-    if (autoScanEnabled) {
-      // Disable auto-scan
-      if (autoScanInterval) {
-        clearInterval(autoScanInterval);
-        setAutoScanInterval(null);
-      }
-      setAutoScanEnabled(false);
-      toast.info("Automatisk scanning avstängd");
-    } else {
-      // Enable auto-scan
-      setAutoScanEnabled(true);
-      toast.success(`Automatisk scanning påslagen (var ${autoScanDelayMs / 1000}:e sekund)`);
-      
-      // Start the automatic scanning interval
-      const interval = setInterval(() => {
-        // Only capture if not currently analyzing
-        if (!isAnalyzing && cameraStarted) {
-          captureImage();
-        }
-      }, autoScanDelayMs);
-      
-      setAutoScanInterval(interval);
-    }
-  };
-
   const resetScanner = () => {
-    // Stop automatic scanning
-    if (autoScanInterval) {
-      clearInterval(autoScanInterval);
-      setAutoScanInterval(null);
-    }
-    setAutoScanEnabled(false);
-    
     setProduct(null);
     setActiveOrders([]);
     setSelectedOrder(null);
@@ -333,12 +280,10 @@ const Scanner = () => {
       const imageBase64 = canvas.toDataURL("image/jpeg", 0.80);
       setCapturedImage(imageBase64);
       
-      // Visual feedback - shorter duration for speed
-      if (!autoScanEnabled) {
-        toast.success("Bild tagen! Analyserar...", { duration: 500 });
-      }
+      // Visual feedback
+      toast.success("Bild tagen! Analyserar...", { duration: 500 });
       
-      // Analyze with AI
+      // Analyze label
       await analyzeLabel(imageBase64);
     } catch (err) {
       console.error("Kunde inte ta foto:", err);
@@ -347,7 +292,7 @@ const Scanner = () => {
   };
 
   const analyzeLabel = async (imageBase64: string, retryCount = 0) => {
-    // Skippa om redan en analys är i gång MED samma bild
+    // Skip if already analyzing
     if (isAnalyzing) {
       return;
     }
@@ -355,17 +300,14 @@ const Scanner = () => {
     setIsAnalyzing(true);
     const maxRetries = 1; // Reduced from 2 for speed
     const attempt = retryCount + 1;
-    const toastId = "ai-analysis";
+    const toastId = "label-analysis";
     
-    // Only show toast for manual scans or first auto-scan
-    if (!autoScanEnabled || attempt === 1) {
-      toast.loading(
-        attempt > 1 
-          ? `Analyserar etikett... (försök ${attempt}/${maxRetries + 1})` 
-          : "Analyserar etikett...", 
-        { id: toastId }
-      );
-    }
+    toast.loading(
+      attempt > 1 
+        ? `Analyserar etikett... (försök ${attempt}/${maxRetries + 1})` 
+        : "Analyserar etikett...", 
+      { id: toastId }
+    );
     
     try {
       // Reduced timeout to 8 seconds for faster response (from 10)
@@ -383,23 +325,21 @@ const Scanner = () => {
       
       setAiResults(data);
       
-      // Show confidence and warnings to user (only for manual scans)
-      if (!autoScanEnabled) {
-        if (data.confidence === 'low') {
-          toast.warning("⚠️ Låg läsbarhet - kontrollera resultatet noga", {
-            id: toastId,
-            duration: 3000 // Reduced from 4000
-          });
-        } else if (data.confidence === 'medium') {
-          toast.info("ℹ️ Medelhög läsbarhet - verifiera artikelnummer", {
-            id: toastId,
-            duration: 2000 // Reduced from 3000
-          });
-        }
+      // Show confidence and warnings to user
+      if (data.confidence === 'low') {
+        toast.warning("⚠️ Låg läsbarhet - kontrollera resultatet noga", {
+          id: toastId,
+          duration: 3000 // Reduced from 4000
+        });
+      } else if (data.confidence === 'medium') {
+        toast.info("ℹ️ Medelhög läsbarhet - verifiera artikelnummer", {
+          id: toastId,
+          duration: 2000 // Reduced from 3000
+        });
       }
       
       if (data.warnings && data.warnings.length > 0) {
-        console.log("AI varningar:", data.warnings);
+        console.log("Varningar:", data.warnings);
       }
       
       if (data.article_numbers.length === 0 && data.product_names.length === 0) {
@@ -414,24 +354,22 @@ const Scanner = () => {
           return await analyzeLabel(imageBase64, retryCount + 1);
         }
         
-        if (!autoScanEnabled) {
-          toast.error("Kunde inte hitta några artikelnummer eller produktnamn. Försök ta en tydligare bild.", {
-            id: toastId,
-            duration: 4000
-          });
-        }
+        toast.error("Kunde inte hitta några artikelnummer eller produktnamn. Försök ta en tydligare bild.", {
+          id: toastId,
+          duration: 4000
+        });
         return;
       }
       
       toast.dismiss(toastId);
-      console.log(`✅ AI hittade ${data.article_numbers.length} artikelnummer och ${data.product_names.length} produktnamn`);
+      console.log(`✅ Hittade ${data.article_numbers.length} artikelnummer och ${data.product_names.length} produktnamn`);
       console.log(`📊 Tillförlitlighet: ${data.confidence}`);
       
       // Auto-match against products
-      await matchProductsFromAI(data);
+      await matchProductsFromAnalysis(data);
       
     } catch (err) {
-      console.error("AI-analys misslyckades:", err);
+      console.error("Analys misslyckades:", err);
       
       // Retry on timeout or network errors
       if (retryCount < maxRetries && err instanceof Error && 
@@ -444,25 +382,21 @@ const Scanner = () => {
         return await analyzeLabel(imageBase64, retryCount + 1);
       }
       
-      if (!autoScanEnabled) {
-        const errorMsg = err instanceof Error ? err.message : "Kunde inte analysera etikett";
-        toast.error(errorMsg + ". Ta en ny bild eller ange artikelnummer manuellt.", { 
-          id: toastId,
-          duration: 5000
-        });
-      }
+      const errorMsg = err instanceof Error ? err.message : "Kunde inte analysera etikett";
+      toast.error(errorMsg + ". Ta en ny bild eller ange artikelnummer manuellt.", { 
+        id: toastId,
+        duration: 5000
+      });
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  const matchProductsFromAI = async (aiData: any) => {
-    const { article_numbers, product_names } = aiData;
+  const matchProductsFromAnalysis = async (analysisData: any) => {
+    const { article_numbers, product_names } = analysisData;
     
     if (article_numbers.length === 0 && product_names.length === 0) {
-      if (!autoScanEnabled) {
-        toast.warning("Inga artikelnummer eller produktnamn att söka efter");
-      }
+      toast.warning("Inga artikelnummer eller produktnamn att söka efter");
       return;
     }
     
@@ -501,21 +435,9 @@ const Scanner = () => {
     }
     
     if (matchedProds.length === 0) {
-      if (!autoScanEnabled) {
-        toast.warning("Kunde inte hitta några matchande produkter i systemet");
-      }
+      toast.warning("Kunde inte hitta några matchande produkter i systemet");
       setMatchedProducts([]);
       return;
-    }
-    
-    // Stop automatic scanning when products are found
-    if (autoScanEnabled && matchedProds.length > 0) {
-      if (autoScanInterval) {
-        clearInterval(autoScanInterval);
-        setAutoScanInterval(null);
-      }
-      setAutoScanEnabled(false);
-      toast.success("Automatisk scanning stoppad - produkt hittad!");
     }
     
     setMatchedProducts(matchedProds);
@@ -1179,27 +1101,6 @@ const Scanner = () => {
                     <>
                       <Camera className="w-5 h-5 mr-2" />
                       Scanna
-                    </>
-                  )}
-                </Button>
-
-                {/* Auto-scan toggle button */}
-                <Button
-                  onClick={toggleAutoScan}
-                  disabled={isAnalyzing}
-                  variant={autoScanEnabled ? "default" : "outline"}
-                  size="default"
-                  className="w-full"
-                >
-                  {autoScanEnabled ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Auto-scan PÅ (var {autoScanDelayMs / 1000}s)
-                    </>
-                  ) : (
-                    <>
-                      <RotateCcw className="w-4 h-4 mr-2" />
-                      Aktivera Auto-scan
                     </>
                   )}
                 </Button>

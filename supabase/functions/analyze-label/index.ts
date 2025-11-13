@@ -134,14 +134,38 @@ Return ONLY valid JSON in this exact format (no markdown, no explanations):
     if (!response.ok) {
       const errorText = await response.text();
       console.error("Gemini API error:", response.status, errorText);
+      
+      // Special handling for rate limit errors (429)
+      let errorMessage = `Gemini API error: ${response.status}`;
+      let userFriendlyMessage = errorText;
+      
+      if (response.status === 429) {
+        errorMessage = 'Gemini API rate limit exceeded';
+        userFriendlyMessage = 'API-gränsen har nåtts. Vänta några minuter eller kontakta administratören för att öka kvoten. Tips: Använd manuell artikelnummerinmatning tills vidare.';
+        
+        // Try to extract retry time if available
+        try {
+          const errorData = JSON.parse(errorText);
+          if (errorData.error?.message) {
+            const retryMatch = errorData.error.message.match(/retry in (\d+\.?\d*)/i);
+            if (retryMatch) {
+              const retrySeconds = Math.ceil(parseFloat(retryMatch[1]));
+              userFriendlyMessage = `API-gränsen har nåtts. Försök igen om ${retrySeconds} sekunder. Tips: Använd manuell artikelnummerinmatning tills vidare.`;
+            }
+          }
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
+      
       return new Response(
         JSON.stringify({ 
-          error: `Gemini API error: ${response.status}`,
-          details: errorText,
+          error: errorMessage,
+          details: userFriendlyMessage,
           article_numbers: [],
           product_names: [],
           confidence: 'low',
-          warnings: [`Gemini API error: ${response.status}`]
+          warnings: [errorMessage]
         }),
         { 
           status: 200,
