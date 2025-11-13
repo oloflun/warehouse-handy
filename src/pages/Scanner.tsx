@@ -249,7 +249,7 @@ const Scanner = () => {
     
     try {
       // Get video element from the reader
-      const videoElement = document.getElementById("reader")?.querySelector("video");
+      const videoElement = document.getElementById("reader")?.querySelector("video") as HTMLVideoElement;
       if (!videoElement) {
         toast.error("Kunde inte hitta video-element");
         return;
@@ -280,6 +280,9 @@ const Scanner = () => {
       const imageBase64 = canvas.toDataURL("image/jpeg", 0.80);
       setCapturedImage(imageBase64);
       
+      // Freeze the camera view by pausing the video
+      videoElement.pause();
+      
       // Visual feedback
       toast.success("Bild tagen! Analyserar...", { duration: 500 });
       
@@ -288,6 +291,12 @@ const Scanner = () => {
     } catch (err) {
       console.error("Kunde inte ta foto:", err);
       toast.error("Kunde inte ta foto. Försök igen.");
+      
+      // Resume video on error
+      const videoElement = document.getElementById("reader")?.querySelector("video") as HTMLVideoElement;
+      if (videoElement) {
+        videoElement.play().catch(console.error);
+      }
     }
   };
 
@@ -389,6 +398,12 @@ const Scanner = () => {
       });
     } finally {
       setIsAnalyzing(false);
+      
+      // Resume video stream after analysis completes
+      const videoElement = document.getElementById("reader")?.querySelector("video") as HTMLVideoElement;
+      if (videoElement) {
+        videoElement.play().catch(console.error);
+      }
     }
   };
 
