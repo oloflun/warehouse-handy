@@ -21,14 +21,30 @@ interface DiagnosticResult {
       };
     };
     tests: {
-      geminiVisionAPI?: {
+      apiKeyValidation?: {
+        success: boolean;
+        status?: number;
+        error?: string;
+        message?: string;
+        note?: string;
+      };
+      visionAPI?: {
         success: boolean;
         status?: number;
         statusText?: string;
         response?: string;
+        finishReason?: string;
         error?: string;
         message?: string;
         note?: string;
+        rawResponse?: any;
+      };
+      jsonFormatTest?: {
+        success: boolean;
+        note?: string;
+        parsed?: any;
+        rawResponse?: string;
+        error?: string;
       };
     };
   };
@@ -65,7 +81,7 @@ const GeminiDiagnostics = () => {
       
       // Show summary toast
       const apiConfigured = data.diagnostics.environment.GEMINI_API_KEY.configured;
-      const apiWorks = data.diagnostics.tests.geminiVisionAPI?.success;
+      const apiWorks = data.diagnostics.tests.visionAPI?.success;
       
       if (apiConfigured && apiWorks) {
         toast.success('✅ Gemini API is working correctly!');
@@ -156,7 +172,7 @@ const GeminiDiagnostics = () => {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                {getStatusIcon(diagnosticResult.diagnostics.tests.geminiVisionAPI?.success)}
+                {getStatusIcon(diagnosticResult.diagnostics.tests.visionAPI?.success)}
                 Status Översikt
               </CardTitle>
               <CardDescription>
@@ -169,66 +185,105 @@ const GeminiDiagnostics = () => {
               <div className="flex items-start justify-between p-4 border rounded-lg">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-semibold">GOOGLE_AI_API_KEY</h3>
-                    {getStatusBadge(diagnosticResult.diagnostics.environment.GOOGLE_AI_API_KEY.configured)}
+                    <h3 className="font-semibold">GEMINI_API_KEY</h3>
+                    {getStatusBadge(diagnosticResult.diagnostics.environment.GEMINI_API_KEY.configured)}
                   </div>
-                  {diagnosticResult.diagnostics.environment.GOOGLE_AI_API_KEY.configured ? (
+                  {diagnosticResult.diagnostics.environment.GEMINI_API_KEY.configured ? (
                     <div className="text-sm text-muted-foreground space-y-1">
-                      <p>Längd: {diagnosticResult.diagnostics.environment.GOOGLE_AI_API_KEY.length} tecken</p>
-                      <p>Prefix: {diagnosticResult.diagnostics.environment.GOOGLE_AI_API_KEY.prefix}</p>
+                      <p>Längd: {diagnosticResult.diagnostics.environment.GEMINI_API_KEY.length} tecken</p>
+                      <p>Prefix: {diagnosticResult.diagnostics.environment.GEMINI_API_KEY.prefix}</p>
                       <p>
-                        Format: {diagnosticResult.diagnostics.environment.GOOGLE_AI_API_KEY.startsWithAIza 
+                        Format: {diagnosticResult.diagnostics.environment.GEMINI_API_KEY.startsWithAIza 
                           ? '✅ Korrekt (börjar med AIza)' 
                           : '⚠️ Ovanligt format'}
                       </p>
                     </div>
                   ) : (
                     <p className="text-sm text-red-500 font-medium">
-                      {diagnosticResult.diagnostics.environment.GOOGLE_AI_API_KEY.error}
+                      {diagnosticResult.diagnostics.environment.GEMINI_API_KEY.error}
                     </p>
                   )}
                 </div>
               </div>
 
-              {/* API Test Result */}
-              {diagnosticResult.diagnostics.tests.geminiVisionAPI && (
+              {/* API Test Results */}
+              {diagnosticResult.diagnostics.tests.apiKeyValidation && (
+                <div className="flex items-start justify-between p-4 border rounded-lg">
+                  <div className="space-y-2 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold">API-nyckel Validering</h3>
+                      {getStatusBadge(diagnosticResult.diagnostics.tests.apiKeyValidation.success)}
+                    </div>
+                    {diagnosticResult.diagnostics.tests.apiKeyValidation.success ? (
+                      <p className="text-sm text-green-600 font-medium">
+                        {diagnosticResult.diagnostics.tests.apiKeyValidation.note}
+                      </p>
+                    ) : (
+                      <div className="space-y-1 text-sm">
+                        <p className="text-red-600 font-medium">
+                          {diagnosticResult.diagnostics.tests.apiKeyValidation.message ||
+                           diagnosticResult.diagnostics.tests.apiKeyValidation.error}
+                        </p>
+                        {diagnosticResult.diagnostics.tests.apiKeyValidation.status && (
+                          <p className="text-muted-foreground">
+                            HTTP Status: {diagnosticResult.diagnostics.tests.apiKeyValidation.status}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {diagnosticResult.diagnostics.tests.visionAPI && (
                 <div className="flex items-start justify-between p-4 border rounded-lg">
                   <div className="space-y-2 flex-1">
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold">Gemini Vision API Test</h3>
-                      {getStatusBadge(diagnosticResult.diagnostics.tests.geminiVisionAPI.success)}
+                      {getStatusBadge(diagnosticResult.diagnostics.tests.visionAPI.success)}
                     </div>
                     
-                    {diagnosticResult.diagnostics.tests.geminiVisionAPI.success ? (
+                    {diagnosticResult.diagnostics.tests.visionAPI.success ? (
                       <div className="space-y-1 text-sm">
                         <p className="text-green-600 font-medium">
-                          {diagnosticResult.diagnostics.tests.geminiVisionAPI.note}
+                          {diagnosticResult.diagnostics.tests.visionAPI.note}
                         </p>
-                        <p className="text-muted-foreground">
-                          Status: {diagnosticResult.diagnostics.tests.geminiVisionAPI.status}
-                        </p>
-                        {diagnosticResult.diagnostics.tests.geminiVisionAPI.response && (
+                        {diagnosticResult.diagnostics.tests.visionAPI.response && (
                           <div className="mt-2 p-2 bg-muted rounded">
                             <p className="font-medium text-xs mb-1">API-svar:</p>
-                            <p className="text-xs">{diagnosticResult.diagnostics.tests.geminiVisionAPI.response}</p>
+                            <p className="text-xs">{diagnosticResult.diagnostics.tests.visionAPI.response}</p>
                           </div>
                         )}
                       </div>
                     ) : (
                       <div className="space-y-1 text-sm">
                         <p className="text-red-600 font-medium">
-                          {diagnosticResult.diagnostics.tests.geminiVisionAPI.message ||
-                           diagnosticResult.diagnostics.tests.geminiVisionAPI.error}
+                          {diagnosticResult.diagnostics.tests.visionAPI.message ||
+                           diagnosticResult.diagnostics.tests.visionAPI.error}
                         </p>
-                        {diagnosticResult.diagnostics.tests.geminiVisionAPI.status && (
+                        {diagnosticResult.diagnostics.tests.visionAPI.status && (
                           <p className="text-muted-foreground">
-                            HTTP Status: {diagnosticResult.diagnostics.tests.geminiVisionAPI.status}
+                            HTTP Status: {diagnosticResult.diagnostics.tests.visionAPI.status}
                             {' '}
-                            {diagnosticResult.diagnostics.tests.geminiVisionAPI.statusText}
+                            {diagnosticResult.diagnostics.tests.visionAPI.statusText}
                           </p>
                         )}
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {diagnosticResult.diagnostics.tests.jsonFormatTest && (
+                <div className="flex items-start justify-between p-4 border rounded-lg">
+                  <div className="space-y-2 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold">JSON Format Test</h3>
+                      {getStatusBadge(diagnosticResult.diagnostics.tests.jsonFormatTest.success)}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {diagnosticResult.diagnostics.tests.jsonFormatTest.note}
+                    </p>
                   </div>
                 </div>
               )}
@@ -255,7 +310,7 @@ const GeminiDiagnostics = () => {
           )}
 
           {/* Setup Instructions (if API key not configured) */}
-          {!diagnosticResult.diagnostics.environment.GOOGLE_AI_API_KEY.configured && (
+          {!diagnosticResult.diagnostics.environment.GEMINI_API_KEY.configured && (
             <Card>
               <CardHeader>
                 <CardTitle>Konfigurera Gemini API</CardTitle>
@@ -292,7 +347,7 @@ const GeminiDiagnostics = () => {
                     Öppna Supabase Dashboard → Settings → Edge Functions → Environment Variables
                   </p>
                   <div className="ml-8 p-3 bg-muted rounded-md text-sm font-mono">
-                    <div>Variable name: <strong>GOOGLE_AI_API_KEY</strong></div>
+                    <div>Variable name: <strong>GEMINI_API_KEY</strong></div>
                     <div>Value: <em>[din API-nyckel här]</em></div>
                   </div>
                 </div>

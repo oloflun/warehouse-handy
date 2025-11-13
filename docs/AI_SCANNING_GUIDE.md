@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide covers the intelligent scanning system for delivery notes and product labels, including best practices, troubleshooting, and technical details.
+This guide covers the intelligent scanning system for delivery notes and product labels, including automatic scanning, manual mode, best practices, troubleshooting, and technical details.
 
 ## Setup & Configuration
 
@@ -31,18 +31,38 @@ See the complete guide: [GEMINI_API_SETUP.md](GEMINI_API_SETUP.md)
 - **Model**: Gemini 2.0 Flash (experimental)
 - **API Endpoint**: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent`
 - **Authentication**: API key (free tier available at https://aistudio.google.com)
-- **Average Response Time**: 1.5-2 seconds
+- **Average Response Time**: 1.5-2.5 seconds (optimized)
 
 ## Features
 
-### 1. Product Label Scanning
+### 1. Automatic Scanning (NEW! ⚡)
+- **Continuous Capture**: Automatically takes photos every 2 seconds
+- **Smart Throttling**: Skips capture if analysis is in progress
+- **Auto-Stop**: Stops automatically when product is found
+- **Toggle Control**: Enable/disable with one button
+- **Visual Feedback**: Clear indicators when auto-scan is active
+
+**When to Use:**
+- ✅ Scanning multiple similar labels
+- ✅ When you can hold the label steady
+- ✅ High-volume warehouse operations
+- ✅ When hands-free operation is beneficial
+
+**When to Use Manual Mode:**
+- ❌ Labels are moving or unstable
+- ❌ Poor or changing lighting conditions
+- ❌ Need precise control over when to capture
+- ❌ Scanning unique or difficult labels
+
+### 2. Product Label Scanning
 - **Auto-detection** of article numbers and product names
 - **High precision** for similar SKUs (e.g., 149216 vs 149126)
 - **Multi-angle support** for tilted/rotated labels
 - **Confidence scoring** (high/medium/low)
-- **Automatic retry** on failures (up to 3 attempts)
+- **Automatic retry** on failures (up to 2 attempts)
+- **Optimized speed** with reduced processing time
 
-### 2. Delivery Note Scanning
+### 3. Delivery Note Scanning
 - **Full document OCR** with structured extraction
 - **Correct godsmärke** from "Godsmärkning rad" (not phone numbers)
 - **Item-by-item parsing** with quantities
@@ -52,7 +72,21 @@ See the complete guide: [GEMINI_API_SETUP.md](GEMINI_API_SETUP.md)
 
 ### Taking Good Photos
 
-#### For Product Labels
+#### For Automatic Scanning Mode
+✅ **DO:**
+- Hold label steady in camera view for 2-3 seconds
+- Use good, consistent lighting
+- Position label within scanner frame
+- Keep phone stable (use both hands if needed)
+- Wait for the beep/vibration (product found)
+
+❌ **DON'T:**
+- Don't move the label around quickly
+- Don't switch between different labels rapidly
+- Don't rely on auto-scan in very poor lighting
+- Don't forget to disable auto-scan when done
+
+#### For Product Labels (Manual Mode)
 ✅ **DO:**
 - Hold phone steady
 - Center the label in frame
