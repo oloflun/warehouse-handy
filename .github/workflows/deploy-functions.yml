@@ -27,7 +27,6 @@ jobs:
 
       - name: Deploy All Functions
         run: |
-<<<<<<< HEAD
           for dir in functions/*/; do
             if [ -d "$dir" ]; then
               function_name=$(basename "$dir")
