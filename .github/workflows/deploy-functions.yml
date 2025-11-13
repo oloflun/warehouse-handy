@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - supabase/functions/**
   workflow_dispatch:
 
 jobs:
@@ -27,23 +25,16 @@ jobs:
 
       - name: Deploy All Functions
         run: |
-          for dir in functions/*/; do
-            if [ -d "$dir" ]; then
-              function_name=$(basename "$dir")
-              echo "Deploying $function_name..."
-              supabase functions deploy "$function_name" --project-ref $PROJECT_ID
-            fi
-          done
+          set -euo pipefail
           cd supabase/functions
           for dir in */; do
             if [ -d "$dir" ]; then
               function_name=$(basename "$dir")
-              # Check if the folder contains index.ts (it's a deployable function)
-              if [ -f "$dir/index.ts" ]; then
+              if [ -f "$dir/index.ts" ] || [ -f "$dir/index.js" ]; then
                 echo "Deploying $function_name..."
-                supabase functions deploy "$function_name" --project-ref $PROJECT_ID
+                supabase functions deploy "$function_name" --project-ref "$PROJECT_ID"
               else
-                echo "Skipping $function_name (no index.ts found - likely shared code)"
+                echo "Skipping $function_name (no index.ts or index.js found)"
               fi
             fi
           done
