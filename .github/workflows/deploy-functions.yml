@@ -34,7 +34,6 @@ jobs:
               supabase functions deploy "$function_name" --project-ref $PROJECT_ID
             fi
           done
-=======
           cd supabase/functions
           for dir in */; do
             if [ -d "$dir" ]; then
