@@ -30,11 +30,11 @@ serve(async (req) => {
       );
     }
 
-    const GOOGLE_AI_API_KEY = Deno.env.get('GOOGLE_AI_API_KEY');
-    if (!GOOGLE_AI_API_KEY) {
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+    if (!GEMINI_API_KEY) {
       return new Response(
         JSON.stringify({ 
-          error: 'GOOGLE_AI_API_KEY not configured. Please add it to Supabase Edge Function environment variables.',
+          error: 'GEMINI_API_KEY not configured. Please add it to Supabase Edge Function environment variables.',
           deliveryNoteNumber: '',
           cargoMarking: null,
           items: []
@@ -95,7 +95,7 @@ ACCURACY IS CRITICAL. If unclear, return null for that field.`;
 
     // Format for Google Gemini API
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GOOGLE_AI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: {

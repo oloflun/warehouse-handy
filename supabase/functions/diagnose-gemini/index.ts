@@ -16,16 +16,16 @@ serve(async (req) => {
     const startTime = Date.now();
     
     // Check environment configuration
-    const GOOGLE_AI_API_KEY = Deno.env.get('GOOGLE_AI_API_KEY');
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
     
     const diagnostics = {
       timestamp: new Date().toISOString(),
       environment: {
-        GOOGLE_AI_API_KEY: GOOGLE_AI_API_KEY ? {
+        GEMINI_API_KEY: GEMINI_API_KEY ? {
           configured: true,
-          length: GOOGLE_AI_API_KEY.length,
-          prefix: GOOGLE_AI_API_KEY.substring(0, 10) + '...',
-          startsWithAIza: GOOGLE_AI_API_KEY.startsWith('AIza')
+          length: GEMINI_API_KEY.length,
+          prefix: GEMINI_API_KEY.substring(0, 10) + '...',
+          startsWithAIza: GEMINI_API_KEY.startsWith('AIza')
         } : {
           configured: false,
           error: 'NOT SET - This is required for scanning features!'
@@ -35,12 +35,12 @@ serve(async (req) => {
     };
 
     // Test: Check if Gemini API is accessible with multiple scenarios
-    if (GOOGLE_AI_API_KEY) {
+    if (GEMINI_API_KEY) {
       // Test 1: Text-only to verify API key works
       try {
         console.log('Test 1: Basic API key validation...');
         const textTest = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GOOGLE_AI_API_KEY}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -83,7 +83,7 @@ serve(async (req) => {
         const testImageBase64 = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlbaWmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD3+iiigD//2Q==';
         
         const visionTest = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GOOGLE_AI_API_KEY}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -130,7 +130,7 @@ serve(async (req) => {
       try {
         console.log('Test 3: JSON response format test...');
         const jsonTest = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GOOGLE_AI_API_KEY}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -175,10 +175,11 @@ serve(async (req) => {
           error: error instanceof Error ? error.message : 'Unknown error'
         };
       }
+    }
     } else {
-      diagnostics.tests.geminiVisionAPI = {
+      diagnostics.tests.visionAPI = {
         success: false,
-        error: 'GOOGLE_AI_API_KEY not configured',
+        error: 'GEMINI_API_KEY not configured',
         instructions: 'Configure in Supabase Dashboard → Settings → Edge Functions → Environment Variables',
         getKeyFrom: 'https://aistudio.google.com/app/apikey'
       };
@@ -188,13 +189,13 @@ serve(async (req) => {
     
     const recommendations = [];
     
-    if (!GOOGLE_AI_API_KEY) {
-      recommendations.push('❌ CRITICAL: GOOGLE_AI_API_KEY is NOT configured!');
+    if (!GEMINI_API_KEY) {
+      recommendations.push('❌ CRITICAL: GEMINI_API_KEY is NOT configured!');
       recommendations.push('Get API key from: https://aistudio.google.com/app/apikey');
       recommendations.push('Add in: Supabase Dashboard → Settings → Edge Functions → Environment Variables');
-      recommendations.push('Variable name: GOOGLE_AI_API_KEY');
+      recommendations.push('Variable name: GEMINI_API_KEY');
       recommendations.push('Wait 2-5 minutes after adding for changes to take effect');
-    } else if (diagnostics.tests.geminiVisionAPI?.success) {
+    } else if (diagnostics.tests.visionAPI?.success) {
       recommendations.push('✅ Gemini API is working correctly!');
       recommendations.push('If scanning still fails:');
       recommendations.push('  1. Check image quality (not too dark/blurry)');

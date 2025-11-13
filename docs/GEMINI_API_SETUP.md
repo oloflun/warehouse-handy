@@ -51,21 +51,21 @@ The warehouse-handy WMS uses Google's Gemini 2.0 Flash model for intelligent sca
    - Select "Edge Functions" tab
    - Scroll to "Environment Variables" section
 
-3. **Add the GOOGLE_AI_API_KEY Variable**
+3. **Add the GEMINI_API_KEY Variable**
    - Click "Add new variable" or "Create secret"
-   - **Name**: `GOOGLE_AI_API_KEY`
+   - **Name**: `GEMINI_API_KEY`
    - **Value**: Paste your API key from Step 1
    - Click "Save" or "Create"
 
    **Example:**
    ```
-   Name:  GOOGLE_AI_API_KEY
+   Name:  GEMINI_API_KEY
    Value: AIzaSyB1234567890abcdefghijklmnopqrstuvwxyz
    ```
 
 4. **Verify Configuration**
    - The variable should now appear in your list
-   - Environment variable name must be EXACTLY `GOOGLE_AI_API_KEY` (case-sensitive)
+   - Environment variable name must be EXACTLY `GEMINI_API_KEY` (case-sensitive)
 
 ### Step 3: Restart Edge Functions
 
@@ -124,12 +124,12 @@ If you need higher limits, upgrade to Google Vertex AI:
 
 ## Troubleshooting
 
-### Error: "GOOGLE_AI_API_KEY not configured"
+### Error: "GEMINI_API_KEY not configured"
 
 **Cause**: Environment variable is missing or misspelled
 
 **Solution**:
-1. Verify variable name is exactly `GOOGLE_AI_API_KEY` (case-sensitive)
+1. Verify variable name is exactly `GEMINI_API_KEY` (case-sensitive)
 2. Check that value is correctly pasted (no extra spaces)
 3. Wait 2-5 minutes for Supabase to refresh
 4. Or manually restart edge functions
@@ -150,7 +150,7 @@ If you need higher limits, upgrade to Google Vertex AI:
 
 **Solution**:
 1. Generate a new API key in Google AI Studio
-2. Update the GOOGLE_AI_API_KEY in Supabase
+2. Update the GEMINI_API_KEY in Supabase
 3. Restart edge functions
 
 ### Error: "Gemini API error: 429"
@@ -229,7 +229,7 @@ FDT_SELLUS_BRANCH_ID=5
 
 ### Required for Scanning Features:
 ```
-GOOGLE_AI_API_KEY=AIzaSyB1234567890abcdefghijklmnopqrstuvwxyz
+GEMINI_API_KEY=AIzaSyB1234567890abcdefghijklmnopqrstuvwxyz
 ```
 
 ## Technical Details
@@ -296,7 +296,7 @@ If you previously used Lovable AI Gateway:
 
 2. **New environment variable** (required):
    ```
-   GOOGLE_AI_API_KEY=AIza...
+   GEMINI_API_KEY=AIza...
    ```
    - Must be added as described above
 
@@ -340,7 +340,7 @@ If you previously used Lovable AI Gateway:
 
 You'll know everything is working when:
 
-- ✅ No "GOOGLE_AI_API_KEY not configured" errors
+- ✅ No "GEMINI_API_KEY not configured" errors
 - ✅ Delivery note scanning completes in 1.5-2 seconds
 - ✅ Correct article numbers extracted (e.g., "149216" not "149126")
 - ✅ Cargo marking (godsmärkning) extracted correctly
