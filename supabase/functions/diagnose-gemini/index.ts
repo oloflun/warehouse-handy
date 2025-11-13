@@ -175,7 +175,6 @@ serve(async (req) => {
           error: error instanceof Error ? error.message : 'Unknown error'
         };
       }
-    }
     } else {
       diagnostics.tests.geminiVisionAPI = {
         success: false,
