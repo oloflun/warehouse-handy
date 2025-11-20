@@ -68,6 +68,23 @@ type DeliveryStatus = 'mottagen' | 'ej_mottagen' | 'delvis_mottagen';
 - 'mottagen': Fully received (quantity_checked >= quantity_expected)
 ```
 
+#### Scanner.tsx
+**Changes:**
+- **MAIN PURPOSE: RECEIVING goods** (inbound), not picking
+- Replaced direct inventory sync with `process-delivery-item` workflow
+- Updated all UI text from "plocka" (pick) to "motta" (receive)
+- Extract order reference from delivery notes or customer notes
+- Full workflow integration with order lookup and purchase order updates
+- Transaction type hardcoded to 'in' for receiving
+- Shows appropriate success/warning messages based on workflow result
+
+**Flow:**
+1. Scan article label → AI recognizes article number
+2. Find orders that need this article
+3. User selects order and quantity to receive
+4. Process through WMS workflow template
+5. Article marked as received in WMS and Sellus
+
 #### DeliveryNoteDetail.tsx
 **Changes:**
 - Updated to use new `process-delivery-item` workflow
@@ -201,6 +218,20 @@ Added deprecation notice:
 - Mark articles with quantity differences with warning sign
 - Display "Alla produkter ej mottagna" message
 
+### 🔄 Scanner.tsx Purpose Clarification
+
+**Scanner.tsx is MAINLY for RECEIVING goods** (inbound operations), not for picking/packing orders.
+
+The workflow is:
+1. User scans article label with camera
+2. AI recognizes article number and optional order reference
+3. System finds matching orders in Sellus that need this article
+4. User selects which order to receive for
+5. System processes through full WMS workflow template (process-delivery-item)
+6. Article is marked as received in both WMS and Sellus
+
+**Picking Mode** (outbound operations) can be implemented later as a separate feature.
+
 ### 🔄 Not Yet Implemented
 
 The following features from the template are not yet fully implemented:
@@ -217,10 +248,10 @@ The following features from the template are not yet fully implemented:
    - Note: Template mentions "Godsmärkning rad" vs top-level "Godsmärkning"
    - Current implementation uses any provided reference
 
-3. **Scanner.tsx Updates**:
-   - ℹ️ Not needed - Scanner is for order picking (outbound), not receiving
-   - Template workflow is specifically for receiving (inbound)
-   - Current Scanner.tsx behavior is correct for its use case
+3. **Picking Operations** (Future):
+   - ⏳ Separate picking workflow for order fulfillment (outbound)
+   - Scanner currently focused on RECEIVING (inbound)
+   - Picking can be added later as distinct feature
 
 ## Testing Recommendations
 
