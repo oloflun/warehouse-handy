@@ -939,6 +939,78 @@ const Scanner = () => {
   const handlePickItem = async (orderLineId: string, orderId: string, quantityToPick: number) => {
     if (!user || !product) return;
     
+    // Get the order line and order details
+    const selectedLine = activeOrders.find((ol: any) => ol.id === orderLineId);
+    if (!selectedLine) {
+      toast.error("Kunde inte hitta orderrad");
+      return;
+    }
+
+    const order = selectedLine.orders;
+    if (!order) {
+      toast.error("Kunde inte hitta orderinformation");
+      return;
+    }
+
+    // Extract article number from product
+    const articleNumber = product.fdt_sellus_article_id || product.barcode;
+    if (!articleNumber) {
+      toast.error("Artikel saknar artikelnummer - kan inte synka till Sellus");
+      return;
+    }
+
+    // Extract order reference from customer_notes or order_number
+    const orderReference = selectedLine.delivery_note_order || order.customer_notes?.match(/Godsmärkning: ([^\s]+)/)?.[1] || order.order_number;
+
+    console.log(`📦 Receiving ${quantityToPick} of article ${articleNumber} for order ${order.order_number}`);
+    
+    // Use the WMS workflow template for receiving
+    toast.loading("Bearbetar mottagning enligt WMS-workflow...", { id: "receive-workflow" });
+
+    const { data: syncResult, error: syncError } = await supabase.functions.invoke(
+      'process-delivery-item',
+      {
+        body: {
+          articleNumber: articleNumber,
+          quantityReceived: quantityToPick,
+          orderReference: orderReference || null,
+          cargoMarking: null, // No delivery note, so no cargo marking
+          deliveryNoteId: null,
+          deliveryNoteItemId: null,
+        }
+      }
+    );
+
+    if (syncError || !syncResult?.success) {
+      console.error("Workflow processing error:", syncError || syncResult);
+      
+      const errorMsg = syncResult?.userMessage || syncResult?.error || syncError?.message || 'Okänt fel';
+      toast.error(`❌ Mottagning misslyckades: ${errorMsg}`, {
+        id: "receive-workflow",
+        duration: 10000,
+      });
+      return;
+    }
+
+    // Show appropriate message based on workflow result
+    if (syncResult.skippedPurchaseOrderSync) {
+      toast.warning(syncResult.userMessage || 'Artikel registrerad men inköpsorder ej uppdaterad', {
+        id: "receive-workflow",
+        duration: 5000,
+      });
+    } else if (syncResult.warning) {
+      toast.warning(syncResult.userMessage || syncResult.warning, {
+        id: "receive-workflow",
+        duration: 5000,
+      });
+    } else {
+      toast.success(`✅ ${quantityToPick} st mottagna och synkade till Sellus`, {
+        id: "receive-workflow",
+        duration: 3000,
+      });
+    }
+
+    // Update local order line status
     const { error: lineError } = await supabase
       .from('order_lines')
       .update({
@@ -950,69 +1022,21 @@ const Scanner = () => {
       .eq('id', orderLineId);
       
     if (lineError) {
-      toast.error("Kunde inte bocka av artikel");
       console.error("Error updating order line:", lineError);
-      return;
+      toast.warning("Artikel mottagen i Sellus men lokalt status kunde inte uppdateras");
     }
     
+    // Create transaction record
     await supabase.from('transactions').insert({
       product_id: product.id,
       location_id: selectedLocation || locations[0]?.id,
-      type: 'in',
+      type: 'in', // Always 'in' for receiving
       quantity: quantityToPick,
       user_id: user.id,
-      notes: `Plockning för order ${selectedOrder.order_number}`
+      notes: `Mottagning för order ${order.order_number}`
     });
-
-    // Sync to Sellus if product has FDT connection
-    if (product.fdt_sellus_article_id) {
-      toast.loading("Uppdaterar lagersaldo i Sellus...", { id: "sellus-sync" });
-      
-      const { data: syncResult, error: syncError } = await supabase.functions.invoke(
-        'update-sellus-stock',
-        {
-          body: {
-            productId: product.id,
-            quantity: quantityToPick,
-            locationId: selectedLocation || locations[0]?.id,
-          }
-        }
-      );
-      
-      if (syncError || !syncResult?.success) {
-        console.error("Sellus sync error:", syncError || syncResult?.error);
-        
-        // Log failure to database for persistent tracking
-        await supabase.from('sellus_sync_failures').insert({
-          product_id: product.id,
-          product_name: product.name,
-          fdt_sellus_article_id: product.fdt_sellus_article_id,
-          quantity_changed: -quantityToPick,
-          error_message: syncError?.message || syncResult?.error || 'Unknown error',
-          order_number: selectedOrder.order_number
-        });
-        
-        toast.error(
-          `⚠️ KRITISKT FEL: Lagersaldo ej synkat till Sellus!\n\n` +
-          `Produkt: ${product.name}\n` +
-          `Plockat: ${quantityToPick} st\n` +
-          `Order: ${selectedOrder.order_number}\n` +
-          `Sellus Artikel-ID: ${product.fdt_sellus_article_id || 'Saknas'}\n\n` +
-          `UPPDATERA MANUELLT I SELLUS OMEDELBART!`,
-          {
-            id: "sellus-sync",
-            duration: 20000,
-          }
-        );
-      } else if (!syncResult?.skipped) {
-        toast.success("✅ Artikel plockad och synkad till Sellus", {
-          id: "sellus-sync",
-        });
-      } else {
-        toast.dismiss("sellus-sync");
-      }
-    }
     
+    // Check if order is complete
     const { data: remainingLines } = await supabase
       .from('order_lines')
       .select('id')
@@ -1028,15 +1052,16 @@ const Scanner = () => {
         })
         .eq('id', orderId);
         
-      toast.success("✅ Order komplett! Markerad som redo.", {
+      toast.success("✅ Order komplett! Alla artiklar mottagna.", {
         duration: 5000,
       });
     } else {
-      toast.warning(`⚠️ Order ej komplett. ${remainingLines.length} artikel(er) kvar att plocka.`, {
+      toast.info(`ℹ️ Order delvis mottagen. ${remainingLines.length} artikel(er) kvar.`, {
         duration: 5000,
       });
     }
     
+    // Update order status if needed
     const { data: orderStatus } = await supabase
       .from('orders')
       .select('status')
@@ -1459,7 +1484,7 @@ const Scanner = () => {
       {pickingMode && activeOrders.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Välj order att plocka för</CardTitle>
+            <CardTitle>Välj order att motta för</CardTitle>
             <CardDescription>
               {activeOrders.length} aktiv(a) order hittades med denna artikel
             </CardDescription>
@@ -1524,7 +1549,7 @@ const Scanner = () => {
                         <div className="text-sm">
                           <p className="font-semibold">Artikelnr: {product.barcode || product.fdt_sellus_article_id}</p>
                           <p className="text-muted-foreground">{product.name}</p>
-                          <p className="mt-1">Antal att plocka: <span className="font-bold">{orderLine.quantity_ordered}</span></p>
+                          <p className="mt-1">Antal att motta: <span className="font-bold">{orderLine.quantity_ordered}</span></p>
                           <p className="text-xs text-muted-foreground">
                             Order datum: {new Date(order.order_date).toLocaleDateString('sv-SE')}
                           </p>
@@ -1545,7 +1570,7 @@ const Scanner = () => {
                 <div className="sticky bottom-0 bg-background pt-3 border-t space-y-3">
                   <div className="space-y-2">
                     <Label htmlFor="pickQuantity" className="text-sm">
-                      Antal att plocka (förväntat: {defaultQuantity})
+                      Antal att motta (förväntat: {defaultQuantity})
                     </Label>
                     <Input
                       id="pickQuantity"
@@ -1566,7 +1591,7 @@ const Scanner = () => {
                     className="w-full"
                     size="lg"
                   >
-                    ✓ Bocka av {quantityToPick} st för order {selectedOrder.order_number}
+                    ✓ Motta {quantityToPick} st för order {selectedOrder.order_number}
                   </Button>
                 </div>
               );

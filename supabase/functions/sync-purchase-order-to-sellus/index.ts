@@ -1,3 +1,16 @@
+/**
+ * DEPRECATED: Use process-delivery-item instead
+ * 
+ * This function is kept for backward compatibility but does not follow
+ * the complete WMS WORKFLOW TEMPLATE. New code should use the 
+ * process-delivery-item function which implements the full 4-step workflow.
+ * 
+ * Old function: sync-purchase-order-to-sellus
+ * New function: process-delivery-item
+ * 
+ * @deprecated Use process-delivery-item for full workflow compliance
+ */
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { callFDTApi, logSync } from '../_shared/fdt-api.ts';
 
