@@ -9,32 +9,34 @@ Important: The stock balance in the system should only be updated when in Sellus
 
 WORKFLOW TEMPLATE- Delivery notes:
 
+
     1. Get order id for the product using the order number reference* displayed on the delivery note:
-GET/orders/{id}
-if null:
-Get order id using the article number:
-GET/items/by-item-number/{itemNumber}
-Copy the item "id"
-Get orders with item id
-GET/items/{item-id}/orders?branchId=5
-if null:
-Get order number from invoice:
-GET/documents/orders/{orderId}
-If null, notify user 
-Copy order id
-Then,
-GET/orders/{id}
-Display active orders- User chooses order and enters article count.
+       GET/orders/{id}
+       if null:
+       Get order id using the article number:
+       GET/items/by-item-number/{itemNumber}
+       Copy the item "id"
+       Get orders with item id:
+       GET/items/{item-id}/orders?branchId=5
+       Display active orders
+       if null:
+       Get order number from invoice:
+       GET/documents/orders/{orderId}
+       If null, notify user 
+       Copy order id
+       Then,
+       GET/orders/{id}
+       Display active orders- User chooses order and enters article count.
     2. Add all updated rows for the corresponding order in the WMS- system under “Ordrar”: Product names, item numbers, quantity, customer records and update delivered articles: 1 / 2 , 3 / 4 etc- Mark as complete when all rows with item numbers are fully deliverd- all rows with item numbers starting with “645/“0645” should always be autofilled as in existing stock*, unless manually changed. 
     3. Get purchase order with the order number REFERENCE(Godsmärkning/Märkning/Referens)
-GET/purchase-orders?filter=%22%20{reference}%20%22
-If null, notify user
+       GET/purchase-orders?filter=%22%20{reference}%20%22
+       If null, notify user
        Copy body, then update the purchase order:
     4. POST/purchase-orders/{id}   
-Paste the copied purchase order and change the following values for the related article:
-"shippedQuantity": {previous number+recieved number on the slip/manually entered}
-"stockQuantity": {previous number+recieved number on the slip/manually entered}
-"totalStockQuantity": {previous number+recieved number on the slip/manually entered} 
+       Paste the copied purchase order and change the following values for the related article:
+       "shippedQuantity": {previous number+recieved number on the slip/manually entered}
+       "stockQuantity": {previous number+recieved number on the slip/manually entered}
+       "totalStockQuantity": {previous number+recieved number on the slip/manually entered} 
 
 IMPORTANT!!
 Use the numbers from the original purchase order, then ADD the delivered amount from the shipment and enter the CALCULATED number (for example, NOT: 1+1, but: 2)
