@@ -139,39 +139,57 @@ export default function DeliveryNoteDetail() {
           : i
       ));
 
-      // Sync to Sellus when checking an item
+      // Sync to Sellus when checking an item using new workflow
       if (checked) {
         toast({
-          title: "Synkroniserar till Sellus...",
-          description: "Uppdaterar inköpsorder",
+          title: "Bearbetar enligt WMS-workflow...",
+          description: "Uppdaterar order och inköpsorder",
         });
 
         // Use quantity_checked to reflect any manual edits
         const quantityToSync = item.quantity_checked || item.quantity_expected;
 
         const { data: syncResult, error: syncError } = await supabase.functions.invoke(
-          'sync-purchase-order-to-sellus',
+          'process-delivery-item',
           {
             body: {
-              itemNumber: item.article_number,
+              articleNumber: item.article_number,
               quantityReceived: quantityToSync,
+              orderReference: item.order_number || null,
               cargoMarking: deliveryNote?.cargo_marking || null,
+              deliveryNoteId: id,
+              deliveryNoteItemId: item.id,
             }
           }
         );
 
         if (syncError || !syncResult?.success) {
-          console.error("Sellus purchase order sync error:", syncError || syncResult?.error);
+          console.error("Workflow processing error:", syncError || syncResult);
+          
+          const errorMsg = syncResult?.userMessage || syncResult?.error || syncError?.message || 'Okänt fel';
           toast({
-            title: "Varning: Sellus-synkning misslyckades",
-            description: syncError?.message || syncResult?.error || 'Okänt fel',
+            title: "Varning: Bearbetning misslyckades",
+            description: errorMsg,
             variant: "destructive",
           });
         } else {
-          toast({
-            title: "✅ Synkat till Sellus",
-            description: `Inköpsorder uppdaterad för ${item.article_number}`,
-          });
+          // Show appropriate message based on workflow result
+          if (syncResult.skippedPurchaseOrderSync) {
+            toast({
+              title: "⚠️ Delvis synkat",
+              description: syncResult.userMessage || 'Artikel registrerad men inköpsorder ej uppdaterad',
+            });
+          } else if (syncResult.warning) {
+            toast({
+              title: "⚠️ Synkat med varning",
+              description: syncResult.userMessage || syncResult.warning,
+            });
+          } else {
+            toast({
+              title: "✅ Workflow komplett",
+              description: syncResult.userMessage || `Order och inköpsorder uppdaterade för ${item.article_number}`,
+            });
+          }
         }
       }
 

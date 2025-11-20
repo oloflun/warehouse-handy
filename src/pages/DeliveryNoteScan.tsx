@@ -27,7 +27,25 @@ interface DeliveryNoteItem {
   is_checked: boolean;
   product_id: string | null;
   quantity_modified?: boolean;
+  order_id?: string | null;
+  fdt_order_id?: string | null;
 }
+
+type DeliveryStatus = 'mottagen' | 'ej_mottagen' | 'delvis_mottagen';
+
+const getDeliveryStatus = (item: DeliveryNoteItem): DeliveryStatus => {
+  if (!item.is_checked) return 'ej_mottagen';
+  if (item.quantity_checked < item.quantity_expected) return 'delvis_mottagen';
+  return 'mottagen';
+};
+
+const getStatusLabel = (status: DeliveryStatus): string => {
+  switch (status) {
+    case 'mottagen': return 'Mottagen';
+    case 'ej_mottagen': return 'Ej mottagen';
+    case 'delvis_mottagen': return 'Delvis mottagen';
+  }
+};
 
 export default function DeliveryNoteScan() {
   const { id } = useParams<{ id: string }>();
@@ -235,6 +253,9 @@ export default function DeliveryNoteScan() {
       ctx.drawImage(videoRef.current, 0, 0, targetWidth, targetHeight);
       const imageData = canvas.toDataURL('image/jpeg', 0.80); // Reduced from 0.85 for speed
 
+      // Freeze the camera view by pausing the video
+      videoRef.current.pause();
+
       if (scanMode === 'delivery-note') {
         console.log('Analyzing delivery note...');
         
@@ -287,8 +308,18 @@ export default function DeliveryNoteScan() {
         description: `${errorMessage}. Tips: Se till att bilden är skarp och välbelyst. Försök igen.`,
         variant: "destructive",
       });
+      
+      // Resume video on error
+      if (videoRef.current) {
+        videoRef.current.play().catch(console.error);
+      }
     } finally {
       setAnalyzing(false);
+      
+      // Resume video stream after analysis completes (if camera not stopped)
+      if (videoRef.current && cameraActive) {
+        videoRef.current.play().catch(console.error);
+      }
     }
   };
 
@@ -481,6 +512,19 @@ export default function DeliveryNoteScan() {
       const { data: user } = await supabase.auth.getUser();
       const item = items.find(i => i.id === itemId);
       if (!item) return;
+
+      // Check if article starts with "645" or "0645" - should be marked as existing stock
+      const isExistingStock = item.article_number.startsWith('645') || item.article_number.startsWith('0645');
+      let quantityToCheck = checked ? item.quantity_expected : 0;
+      
+      if (isExistingStock && checked) {
+        toast({
+          title: "Befintligt lager",
+          description: `Artikel ${item.article_number} markeras som befintligt lager och synkas till Sellus`,
+        });
+        // For existing stock items, we still sync to Sellus to update purchase orders
+        // as per WMS workflow template requirements
+      }
       
       const { error } = await supabase
         .from('delivery_note_items')
@@ -488,7 +532,7 @@ export default function DeliveryNoteScan() {
           is_checked: checked,
           checked_at: checked ? new Date().toISOString() : null,
           checked_by: checked ? user.user?.id : null,
-          quantity_checked: checked ? item.quantity_expected : 0
+          quantity_checked: quantityToCheck
         })
         .eq('id', itemId);
 
@@ -496,43 +540,63 @@ export default function DeliveryNoteScan() {
 
       setItems(items.map(i => 
         i.id === itemId 
-          ? { ...i, is_checked: checked, quantity_checked: checked ? item.quantity_expected : 0 }
+          ? { ...i, is_checked: checked, quantity_checked: quantityToCheck }
           : i
       ));
 
-      // Sync to Sellus when checking an item
+      // Process through full workflow when checking an item
       if (checked) {
+        const status = getDeliveryStatus({...item, is_checked: true, quantity_checked: quantityToCheck});
         toast({
-          title: "Synkroniserar till Sellus...",
-          description: "Uppdaterar inköpsorder",
+          title: "Bearbetar enligt WMS-workflow...",
+          description: `Status: ${getStatusLabel(status)}`,
         });
 
         // Use quantity_checked to reflect any manual edits
         const quantityToSync = item.quantity_checked || item.quantity_expected;
 
         const { data: syncResult, error: syncError } = await supabase.functions.invoke(
-          'sync-purchase-order-to-sellus',
+          'process-delivery-item',
           {
             body: {
-              itemNumber: item.article_number,
+              articleNumber: item.article_number,
               quantityReceived: quantityToSync,
+              orderReference: item.order_number || null,
               cargoMarking: cargoMarking || null,
+              deliveryNoteId: deliveryNoteId,
+              deliveryNoteItemId: item.id,
             }
           }
         );
 
         if (syncError || !syncResult?.success) {
-          console.error("Sellus purchase order sync error:", syncError || syncResult?.error);
+          console.error("Workflow processing error:", syncError || syncResult);
+          
+          const errorMsg = syncResult?.userMessage || syncResult?.error || syncError?.message || 'Okänt fel';
           toast({
-            title: "Varning: Sellus-synkning misslyckades",
-            description: syncError?.message || syncResult?.error || 'Okänt fel',
+            title: "Varning: Bearbetning misslyckades",
+            description: errorMsg,
             variant: "destructive",
           });
         } else {
-          toast({
-            title: "✅ Synkat till Sellus",
-            description: `Inköpsorder uppdaterad för ${item.article_number}`,
-          });
+          // Show appropriate message based on workflow result
+          if (syncResult.skippedPurchaseOrderSync) {
+            toast({
+              title: "⚠️ Delvis synkat",
+              description: syncResult.userMessage || 'Artikel registrerad men inköpsorder ej uppdaterad',
+            });
+          } else if (syncResult.warning) {
+            toast({
+              title: "⚠️ Synkat med varning",
+              description: syncResult.userMessage || syncResult.warning,
+            });
+          } else {
+            const finalStatus = getDeliveryStatus({...item, is_checked: true, quantity_checked: quantityToSync});
+            toast({
+              title: `✅ ${getStatusLabel(finalStatus)}`,
+              description: syncResult.userMessage || `Order och inköpsorder uppdaterade för ${item.article_number}`,
+            });
+          }
         }
       }
 
@@ -680,15 +744,31 @@ export default function DeliveryNoteScan() {
         {/* Items List */}
         {deliveryNoteId && items.length > 0 && (
           <div className="space-y-2">
-            {items.map((item) => (
-              <DeliveryNoteItemCard
-                key={item.id}
-                item={item}
-                cargoMarking={cargoMarking}
-                onCheck={handleCheckItem}
-                onQuantityChange={handleQuantityChange}
-              />
-            ))}
+            {items.map((item) => {
+              const status = getDeliveryStatus(item);
+              return (
+                <div key={item.id} className="relative">
+                  <DeliveryNoteItemCard
+                    item={item}
+                    cargoMarking={cargoMarking}
+                    onCheck={handleCheckItem}
+                    onQuantityChange={handleQuantityChange}
+                  />
+                  {/* Status badge overlay */}
+                  <div className="absolute top-2 right-2">
+                    {status === 'mottagen' && (
+                      <Badge className="bg-green-500">Mottagen</Badge>
+                    )}
+                    {status === 'delvis_mottagen' && (
+                      <Badge className="bg-yellow-500">Delvis mottagen</Badge>
+                    )}
+                    {status === 'ej_mottagen' && (
+                      <Badge variant="outline">Ej mottagen</Badge>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
