@@ -513,17 +513,17 @@ export default function DeliveryNoteScan() {
       const item = items.find(i => i.id === itemId);
       if (!item) return;
 
-      // Auto-fill articles starting with "645" or "0645" as existing stock (befintligt lager)
+      // Check if article starts with "645" or "0645" - should be marked as existing stock
       const isExistingStock = item.article_number.startsWith('645') || item.article_number.startsWith('0645');
       let quantityToCheck = checked ? item.quantity_expected : 0;
       
       if (isExistingStock && checked) {
         toast({
           title: "Befintligt lager",
-          description: `Artikel ${item.article_number} markeras automatiskt som befintligt lager`,
+          description: `Artikel ${item.article_number} markeras som befintligt lager och synkas till Sellus`,
         });
-        // For existing stock items, we mark them as checked but may not need to sync to Sellus
-        // depending on business logic - for now we proceed with the workflow
+        // For existing stock items, we still sync to Sellus to update purchase orders
+        // as per WMS workflow template requirements
       }
       
       const { error } = await supabase

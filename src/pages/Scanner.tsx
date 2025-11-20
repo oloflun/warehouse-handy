@@ -946,6 +946,12 @@ const Scanner = () => {
       return;
     }
 
+    const order = selectedLine.orders;
+    if (!order) {
+      toast.error("Kunde inte hitta orderinformation");
+      return;
+    }
+
     // Extract article number from product
     const articleNumber = product.fdt_sellus_article_id || product.barcode;
     if (!articleNumber) {
@@ -954,9 +960,9 @@ const Scanner = () => {
     }
 
     // Extract order reference from customer_notes or order_number
-    const orderReference = selectedLine.delivery_note_order || selectedLine.orders?.customer_notes?.match(/Godsmärkning: ([^\s]+)/)?.[1] || selectedLine.orders?.order_number;
+    const orderReference = selectedLine.delivery_note_order || order.customer_notes?.match(/Godsmärkning: ([^\s]+)/)?.[1] || order.order_number;
 
-    console.log(`📦 Receiving ${quantityToPick} of article ${articleNumber} for order ${selectedOrder.order_number}`);
+    console.log(`📦 Receiving ${quantityToPick} of article ${articleNumber} for order ${order.order_number}`);
     
     // Use the WMS workflow template for receiving
     toast.loading("Bearbetar mottagning enligt WMS-workflow...", { id: "receive-workflow" });
@@ -1027,7 +1033,7 @@ const Scanner = () => {
       type: 'in', // Always 'in' for receiving
       quantity: quantityToPick,
       user_id: user.id,
-      notes: `Mottagning för order ${selectedOrder.order_number}`
+      notes: `Mottagning för order ${order.order_number}`
     });
     
     // Check if order is complete

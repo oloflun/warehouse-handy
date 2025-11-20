@@ -140,12 +140,6 @@ Deno.serve(async (req) => {
           if (orderDetailsResponse.success) {
             fdtOrder = orderDetailsResponse.data;
           }
-        } else {
-          // 1d. Last resort: Try to get from invoice/documents
-          console.log(`   1d. No orders found, trying GET /documents/orders/${fdtOrderId || 'unknown'}`);
-          // This endpoint requires an order ID, which we don't have yet
-          // So we skip this step as it's not viable without an order ID
-          console.log(`   ⚠️  Cannot query documents without order ID`);
         }
       }
     }
@@ -310,8 +304,9 @@ Deno.serve(async (req) => {
     const searchReference = cargoMarking || orderReference;
     console.log(`   Searching for purchase order with reference: "${searchReference}"`);
 
+    // Note: API filter format may vary - testing needed to confirm exact format
     const purchaseOrderResponse = await callFDTApi({
-      endpoint: `/purchase-orders?filter=" ${encodeURIComponent(searchReference)} "`,
+      endpoint: `/purchase-orders?filter="${encodeURIComponent(searchReference)}"`,
       method: 'GET',
     });
 
