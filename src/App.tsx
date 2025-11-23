@@ -21,6 +21,7 @@ import DeliveryNoteDetail from "./pages/DeliveryNoteDetail";
 import DeliveryNoteScan from "./pages/DeliveryNoteScan";
 import UserManagement from "./pages/UserManagement";
 import NotFound from "./pages/NotFound";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -31,23 +32,28 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Integrations />} />
           <Route path="/auth" element={<Auth />} />
-          <Route path="/scanner" element={<Scanner />} />
-          <Route path="/inventory" element={<InventoryPage />} />
-          <Route path="/articles" element={<ArticlesPage />} />
-          <Route path="/sales" element={<SalesPage />} />
-          <Route path="/sales/:orderId" element={<OrderDetailPage />} />
-          <Route path="/fdt-explorer" element={<FDTExplorer />} />
-          <Route path="/gemini-diagnostics" element={<GeminiDiagnostics />} />
-          <Route path="/openai-diagnostics" element={<OpenAIDiagnostics />} />
-          <Route path="/admin-tools" element={<AdminTools />} />
-          <Route path="/sync-log" element={<SyncLog />} />
-          <Route path="/delivery-notes" element={<DeliveryNotes />} />
-          <Route path="/delivery-notes/:id" element={<DeliveryNoteDetail />} />
-          <Route path="/delivery-notes/scan" element={<DeliveryNoteScan />} />
-          <Route path="/delivery-notes/scan/:id" element={<DeliveryNoteScan />} />
-          <Route path="/user-management" element={<UserManagement />} />
+
+          {/* Protected Routes */}
+          <Route element={<ProtectedRoute />}>
+            <Route path="/" element={<Integrations />} />
+            <Route path="/scanner" element={<Scanner />} />
+            <Route path="/inventory" element={<InventoryPage />} />
+            <Route path="/articles" element={<ArticlesPage />} />
+            <Route path="/sales" element={<SalesPage />} />
+            <Route path="/sales/:orderId" element={<OrderDetailPage />} />
+            <Route path="/fdt-explorer" element={<FDTExplorer />} />
+            <Route path="/gemini-diagnostics" element={<GeminiDiagnostics />} />
+            <Route path="/openai-diagnostics" element={<OpenAIDiagnostics />} />
+            <Route path="/admin-tools" element={<AdminTools />} />
+            <Route path="/sync-log" element={<SyncLog />} />
+            <Route path="/delivery-notes" element={<DeliveryNotes />} />
+            <Route path="/delivery-notes/:id" element={<DeliveryNoteDetail />} />
+            <Route path="/delivery-notes/scan" element={<DeliveryNoteScan />} />
+            <Route path="/delivery-notes/scan/:id" element={<DeliveryNoteScan />} />
+            <Route path="/user-management" element={<UserManagement />} />
+          </Route>
+
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

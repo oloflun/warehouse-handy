@@ -59,30 +59,41 @@ const GeminiDiagnostics = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [autoChecked, setAutoChecked] = useState(false);
 
-  // Auto-check on mount
+  // Check auth and auto-check on mount
   useEffect(() => {
-    if (!autoChecked) {
-      runDiagnostics();
-      setAutoChecked(true);
-    }
-  }, [autoChecked]);
+    const checkAuthAndRun = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Du måste vara inloggad för att köra diagnostik");
+        navigate("/auth");
+        return;
+      }
+
+      if (!autoChecked) {
+        runDiagnostics();
+        setAutoChecked(true);
+      }
+    };
+
+    checkAuthAndRun();
+  }, [autoChecked, navigate]);
 
   const runDiagnostics = async () => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('diagnose-gemini');
-      
+
       if (error) {
         toast.error(`Diagnostics failed: ${error.message}`);
         return;
       }
 
       setDiagnosticResult(data);
-      
+
       // Show summary toast
       const apiConfigured = data.diagnostics.environment.GEMINI_API_KEY.configured;
       const apiWorks = data.diagnostics.tests.visionAPI?.success;
-      
+
       if (apiConfigured && apiWorks) {
         toast.success('✅ Gemini API is working correctly!');
       } else if (!apiConfigured) {
@@ -90,7 +101,7 @@ const GeminiDiagnostics = () => {
       } else {
         toast.warning('⚠️ API key is configured but API calls are failing');
       }
-      
+
     } catch (err) {
       console.error('Diagnostics error:', err);
       toast.error('Failed to run diagnostics');
@@ -101,7 +112,7 @@ const GeminiDiagnostics = () => {
 
   const getStatusIcon = (success: boolean | undefined) => {
     if (success === undefined) return <Loader2 className="h-5 w-5 animate-spin" />;
-    return success 
+    return success
       ? <CheckCircle className="h-5 w-5 text-green-500" />
       : <XCircle className="h-5 w-5 text-red-500" />;
   };
@@ -176,7 +187,7 @@ const GeminiDiagnostics = () => {
                 Status Översikt
               </CardTitle>
               <CardDescription>
-                Kördes {new Date(diagnosticResult.diagnostics.timestamp).toLocaleString('sv-SE')} 
+                Kördes {new Date(diagnosticResult.diagnostics.timestamp).toLocaleString('sv-SE')}
                 {' '}({diagnosticResult.elapsed})
               </CardDescription>
             </CardHeader>
@@ -193,8 +204,8 @@ const GeminiDiagnostics = () => {
                       <p>Längd: {diagnosticResult.diagnostics.environment.GEMINI_API_KEY.length} tecken</p>
                       <p>Prefix: {diagnosticResult.diagnostics.environment.GEMINI_API_KEY.prefix}</p>
                       <p>
-                        Format: {diagnosticResult.diagnostics.environment.GEMINI_API_KEY.startsWithAIza 
-                          ? '✅ Korrekt (börjar med AIza)' 
+                        Format: {diagnosticResult.diagnostics.environment.GEMINI_API_KEY.startsWithAIza
+                          ? '✅ Korrekt (börjar med AIza)'
                           : '⚠️ Ovanligt format'}
                       </p>
                     </div>
@@ -222,7 +233,7 @@ const GeminiDiagnostics = () => {
                       <div className="space-y-1 text-sm">
                         <p className="text-red-600 font-medium">
                           {diagnosticResult.diagnostics.tests.apiKeyValidation.message ||
-                           diagnosticResult.diagnostics.tests.apiKeyValidation.error}
+                            diagnosticResult.diagnostics.tests.apiKeyValidation.error}
                         </p>
                         {diagnosticResult.diagnostics.tests.apiKeyValidation.status && (
                           <p className="text-muted-foreground">
@@ -242,7 +253,7 @@ const GeminiDiagnostics = () => {
                       <h3 className="font-semibold">Gemini Vision API Test</h3>
                       {getStatusBadge(diagnosticResult.diagnostics.tests.visionAPI.success)}
                     </div>
-                    
+
                     {diagnosticResult.diagnostics.tests.visionAPI.success ? (
                       <div className="space-y-1 text-sm">
                         <p className="text-green-600 font-medium">
@@ -259,7 +270,7 @@ const GeminiDiagnostics = () => {
                       <div className="space-y-1 text-sm">
                         <p className="text-red-600 font-medium">
                           {diagnosticResult.diagnostics.tests.visionAPI.message ||
-                           diagnosticResult.diagnostics.tests.visionAPI.error}
+                            diagnosticResult.diagnostics.tests.visionAPI.error}
                         </p>
                         {diagnosticResult.diagnostics.tests.visionAPI.status && (
                           <p className="text-muted-foreground">
@@ -294,8 +305,8 @@ const GeminiDiagnostics = () => {
           {diagnosticResult.recommendations && diagnosticResult.recommendations.length > 0 && (
             <Alert variant={
               diagnosticResult.recommendations[0].startsWith('✅') ? 'default' :
-              diagnosticResult.recommendations[0].startsWith('❌') ? 'destructive' :
-              'default'
+                diagnosticResult.recommendations[0].startsWith('❌') ? 'destructive' :
+                  'default'
             }>
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>Rekommendationer</AlertTitle>
@@ -326,9 +337,9 @@ const GeminiDiagnostics = () => {
                   </h4>
                   <p className="text-sm text-muted-foreground ml-8">
                     Gå till{' '}
-                    <a 
-                      href="https://aistudio.google.com/app/apikey" 
-                      target="_blank" 
+                    <a
+                      href="https://aistudio.google.com/app/apikey"
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="text-primary underline"
                     >

@@ -40,7 +40,7 @@ serve(async (req) => {
       try {
         console.log('Test 1: Basic API key validation...');
         const textTest = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -59,7 +59,7 @@ serve(async (req) => {
             error: errorText,
             message: textTest.status === 401 ? 'Invalid API key'
               : textTest.status === 403 ? 'API key lacks permissions'
-                : textTest.status === 404 ? 'Model not found - gemini-1.5-flash-latest may not be available'
+                : textTest.status === 404 ? 'Model not found - gemini-2.0-flash may not be available'
                   : 'API error'
           };
         } else {
@@ -83,7 +83,7 @@ serve(async (req) => {
         const testImageBase64 = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlbaWmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD3+iiigD//2Q==';
 
         const visionTest = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -130,7 +130,7 @@ serve(async (req) => {
       try {
         console.log('Test 3: JSON response format test...');
         const jsonTest = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -171,6 +171,38 @@ serve(async (req) => {
         }
       } catch (error) {
         diagnostics.tests.jsonFormatTest = {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+
+      // Test 4: List Available Models
+      try {
+        console.log('Test 4: Listing available models...');
+        const listModels = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`,
+          {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+
+        if (listModels.ok) {
+          const data = await listModels.json();
+          diagnostics.tests.availableModels = {
+            success: true,
+            models: data.models?.map((m: any) => m.name) || []
+          };
+        } else {
+          const errorText = await listModels.text();
+          diagnostics.tests.availableModels = {
+            success: false,
+            status: listModels.status,
+            error: errorText
+          };
+        }
+      } catch (error) {
+        diagnostics.tests.availableModels = {
           success: false,
           error: error instanceof Error ? error.message : 'Unknown error'
         };
