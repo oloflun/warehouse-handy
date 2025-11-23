@@ -80,3 +80,18 @@ FDT_SELLUS_BRANCH_ID=5  # Optional, defaults to 5
 - **DELETE** - Remove resources
 
 Always refer to the FDT Sellus API Swagger documentation for the correct HTTP method for each endpoint.
+
+## Gemini API Configuration & Troubleshooting
+
+### 429 "Too Many Requests" Errors
+If you encounter `429` errors when scanning labels or delivery notes, it means the Google Gemini API rate limit has been exceeded.
+
+**Solution:**
+1.  **Model Selection**: We have switched to `gemini-2.0-flash` which offers better stability and higher rate limits than the experimental versions.
+2.  **Wait & Retry**: The application now handles these errors gracefully. If you see this error, wait a minute and try again.
+3.  **Check Quota**: Ensure your Google Cloud project has billing enabled or sufficient quota for the Gemini API.
+
+### Localhost Development
+If you cannot log in on `localhost`:
+-   Ensure your `.env` file has the correct `VITE_SUPABASE_PROJECT_ID` (`sublzjeyxfaxiekacfme`).
+-   Verify that `VITE_SUPABASE_PUBLISHABLE_KEY` matches the **Anon Key** from the Supabase dashboard.
