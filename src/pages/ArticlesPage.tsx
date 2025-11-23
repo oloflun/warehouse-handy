@@ -7,7 +7,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, RefreshCw, List, Search, CheckCircle2, XCircle } from "lucide-react";
+import { ArrowLeft, RefreshCw, List, Search, CheckCircle2, XCircle, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Article {
   id: string;
@@ -29,10 +39,25 @@ const ArticlesPage = () => {
   const [syncing, setSyncing] = useState(false);
   const [resolvingIds, setResolvingIds] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [articleToDelete, setArticleToDelete] = useState<Article | null>(null);
 
   useEffect(() => {
+    checkSuperAdmin();
     fetchArticles();
   }, []);
+
+  const checkSuperAdmin = async () => {
+    try {
+      const { data } = await supabase.rpc('is_super_admin', {
+        _user_id: (await supabase.auth.getUser()).data.user?.id
+      });
+      setIsSuperAdmin(data || false);
+    } catch (error) {
+      console.error('Error checking super admin status:', error);
+    }
+  };
 
   const fetchArticles = async () => {
     try {
@@ -81,7 +106,7 @@ const ArticlesPage = () => {
 
       const deleted = data?.deleted || 0;
       const inactivated = data?.inactivated || 0;
-      
+
       toast({
         title: "Synkronisering slutförd",
         description: `Synkade ${data?.synced || 0} artiklar från varugrupp 1200- Elon${deleted + inactivated > 0 ? `, ${deleted} raderade, ${inactivated} inaktiverade` : ''}`,
@@ -107,7 +132,7 @@ const ArticlesPage = () => {
       if (error) throw error;
 
       const stats = data?.stats || {};
-      
+
       toast({
         title: "ID-upplösning slutförd",
         description: `Löste ${stats.resolved || 0} av ${stats.total || 0} artiklar${stats.failed > 0 ? `, ${stats.failed} misslyckades` : ''}`,
@@ -122,6 +147,52 @@ const ArticlesPage = () => {
       });
     } finally {
       setResolvingIds(false);
+    }
+  };
+
+  const handleDeleteClick = (article: Article) => {
+    setArticleToDelete(article);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!articleToDelete) return;
+
+    try {
+      // Delete inventory records first
+      const { error: inventoryError } = await supabase
+        .from('inventory')
+        .delete()
+        .eq('product_id', articleToDelete.id);
+
+      if (inventoryError) throw inventoryError;
+
+      // Delete the product
+      const { error: productError } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', articleToDelete.id);
+
+      if (productError) throw productError;
+
+      const articleNumber = articleToDelete.barcode || articleToDelete.fdt_sellus_article_id || articleToDelete.name;
+      toast({
+        title: "Raderad",
+        description: `Artikel ${articleNumber} har raderats`,
+      });
+
+      // Refresh the list
+      fetchArticles();
+    } catch (error) {
+      console.error('Error deleting article:', error);
+      toast({
+        title: "Fel",
+        description: "Kunde inte radera artikel",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteDialogOpen(false);
+      setArticleToDelete(null);
     }
   };
 
@@ -192,12 +263,13 @@ const ArticlesPage = () => {
                 <TableHead>I lager</TableHead>
                 <TableHead>Synkstatus</TableHead>
                 <TableHead>Senast synkad</TableHead>
+                {isSuperAdmin && <TableHead className="w-[50px]"></TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredArticles.map((article) => {
                 const articleNumber = article.barcode || article.fdt_sellus_article_id || 'N/A';
-                
+
                 return (
                   <TableRow key={article.id}>
                     <TableCell className="font-mono">{articleNumber}</TableCell>
@@ -220,7 +292,7 @@ const ArticlesPage = () => {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge 
+                      <Badge
                         variant={article.fdt_sync_status === 'synced' ? 'default' : 'secondary'}
                         className={article.fdt_sync_status === 'synced' ? 'bg-success text-success-foreground' : ''}
                       >
@@ -228,10 +300,22 @@ const ArticlesPage = () => {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {article.fdt_last_synced 
+                      {article.fdt_last_synced
                         ? new Date(article.fdt_last_synced).toLocaleString('sv-SE')
                         : '-'}
                     </TableCell>
+                    {isSuperAdmin && (
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => handleDeleteClick(article)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 );
               })}
@@ -239,6 +323,31 @@ const ArticlesPage = () => {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Radera artikel?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Är du säker på att du vill radera artikel{' '}
+              <strong>{articleToDelete?.barcode || articleToDelete?.fdt_sellus_article_id || articleToDelete?.name}</strong>?
+              Detta kommer permanent radera artikeln och alla dess lagerplatser.
+              <br /><br />
+              <strong className="text-destructive">Denna åtgärd kan inte ångras.</strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Radera
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

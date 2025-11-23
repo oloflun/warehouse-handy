@@ -5,7 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, RefreshCw, ShoppingCart, ChevronRight } from "lucide-react";
+import { ArrowLeft, RefreshCw, ShoppingCart, ChevronRight, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface OrderSummary {
   id: string;
@@ -26,10 +36,25 @@ const SalesPage = () => {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [orderToDelete, setOrderToDelete] = useState<OrderSummary | null>(null);
 
   useEffect(() => {
+    checkSuperAdmin();
     fetchOrders();
   }, []);
+
+  const checkSuperAdmin = async () => {
+    try {
+      const { data } = await supabase.rpc('is_super_admin', {
+        _user_id: (await supabase.auth.getUser()).data.user?.id
+      });
+      setIsSuperAdmin(data || false);
+    } catch (error) {
+      console.error('Error checking super admin status:', error);
+    }
+  };
 
   const fetchOrders = async () => {
     try {
@@ -77,9 +102,55 @@ const SalesPage = () => {
     }
   };
 
+  const handleDeleteClick = (e: React.MouseEvent, order: OrderSummary) => {
+    e.stopPropagation();
+    setOrderToDelete(order);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!orderToDelete) return;
+
+    try {
+      // Delete order lines first
+      const { error: linesError } = await supabase
+        .from('order_lines')
+        .delete()
+        .eq('order_id', orderToDelete.id);
+
+      if (linesError) throw linesError;
+
+      // Delete the order
+      const { error: orderError } = await supabase
+        .from('orders')
+        .delete()
+        .eq('id', orderToDelete.id);
+
+      if (orderError) throw orderError;
+
+      toast({
+        title: "Raderad",
+        description: `Order #${orderToDelete.order_number} har raderats`,
+      });
+
+      // Refresh the list
+      fetchOrders();
+    } catch (error) {
+      console.error('Error deleting order:', error);
+      toast({
+        title: "Fel",
+        description: "Kunde inte radera order",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteDialogOpen(false);
+      setOrderToDelete(null);
+    }
+  };
+
   const getStatusBadge = (status: string | null) => {
     if (!status) return <Badge variant="secondary">Okänd</Badge>;
-    
+
     const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" }> = {
       'pending': { label: 'Väntande', variant: 'secondary' },
       'completed': { label: 'Slutförd', variant: 'default' },
@@ -92,7 +163,7 @@ const SalesPage = () => {
 
   const getPickStatusBadge = (pickStatus: string | null) => {
     if (!pickStatus) return null;
-    
+
     const statusMap: Record<string, { label: string; className: string }> = {
       'Ej påbörjad': { label: 'Ej påbörjad', className: 'bg-muted text-muted-foreground' },
       'Påbörjad': { label: 'Påbörjad', className: 'bg-warning text-warning-foreground' },
@@ -164,7 +235,7 @@ const SalesPage = () => {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filteredOrders.map((order) => (
-          <Card 
+          <Card
             key={order.id}
             className="cursor-pointer hover:shadow-lg transition-shadow"
             onClick={() => navigate(`/sales/${order.id}`)}
@@ -172,7 +243,19 @@ const SalesPage = () => {
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span className="text-lg">#{order.order_number}</span>
-                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                <div className="flex items-center gap-2">
+                  {isSuperAdmin && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={(e) => handleDeleteClick(e, order)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -180,11 +263,11 @@ const SalesPage = () => {
                 <p className="text-sm text-muted-foreground">Kund</p>
                 <p className="font-medium">{order.customer_name || 'Okänd kund'}</p>
               </div>
-              
+
               <div>
                 <p className="text-sm text-muted-foreground">Datum</p>
                 <p className="font-medium">
-                  {order.order_date 
+                  {order.order_date
                     ? new Date(order.order_date).toLocaleDateString('sv-SE')
                     : '-'}
                 </p>
@@ -219,6 +302,30 @@ const SalesPage = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Radera order?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Är du säker på att du vill radera order #{orderToDelete?.order_number}?
+              Detta kommer permanent radera ordern och alla dess rader.
+              <br /><br />
+              <strong className="text-destructive">Denna åtgärd kan inte ångras.</strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Radera
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

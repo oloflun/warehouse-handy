@@ -4,9 +4,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Package, CheckCircle2, Clock } from "lucide-react";
+import { ArrowLeft, Plus, Package, CheckCircle2, Clock, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface DeliveryNote {
   id: string;
@@ -23,10 +33,25 @@ export default function DeliveryNotes() {
   const { toast } = useToast();
   const [deliveryNotes, setDeliveryNotes] = useState<DeliveryNote[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [noteToDelete, setNoteToDelete] = useState<DeliveryNote | null>(null);
 
   useEffect(() => {
+    checkSuperAdmin();
     fetchDeliveryNotes();
   }, []);
+
+  const checkSuperAdmin = async () => {
+    try {
+      const { data } = await supabase.rpc('is_super_admin', {
+        _user_id: (await supabase.auth.getUser()).data.user?.id
+      });
+      setIsSuperAdmin(data || false);
+    } catch (error) {
+      console.error('Error checking super admin status:', error);
+    }
+  };
 
   const fetchDeliveryNotes = async () => {
     try {
@@ -75,6 +100,52 @@ export default function DeliveryNotes() {
     }
   };
 
+  const handleDeleteClick = (e: React.MouseEvent, note: DeliveryNote) => {
+    e.stopPropagation();
+    setNoteToDelete(note);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!noteToDelete) return;
+
+    try {
+      // Delete delivery note items first (cascade should handle this, but being explicit)
+      const { error: itemsError } = await supabase
+        .from('delivery_note_items')
+        .delete()
+        .eq('delivery_note_id', noteToDelete.id);
+
+      if (itemsError) throw itemsError;
+
+      // Delete the delivery note
+      const { error: noteError } = await supabase
+        .from('delivery_notes')
+        .delete()
+        .eq('id', noteToDelete.id);
+
+      if (noteError) throw noteError;
+
+      toast({
+        title: "Raderad",
+        description: `Följesedel #${noteToDelete.delivery_note_number} har raderats`,
+      });
+
+      // Refresh the list
+      fetchDeliveryNotes();
+    } catch (error) {
+      console.error('Error deleting delivery note:', error);
+      toast({
+        title: "Fel",
+        description: "Kunde inte radera följesedel",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteDialogOpen(false);
+      setNoteToDelete(null);
+    }
+  };
+
   const getStatusBadge = (note: DeliveryNote) => {
     if (note.status === 'completed') {
       return <Badge className="bg-green-500"><CheckCircle2 className="h-3 w-3 mr-1" />Klar</Badge>;
@@ -119,7 +190,7 @@ export default function DeliveryNotes() {
           <Card className="p-8 text-center">
             <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <p className="text-muted-foreground">Inga följesedlar än</p>
-            <Button 
+            <Button
               className="mt-4"
               onClick={() => navigate('/delivery-notes/scan')}
             >
@@ -144,7 +215,19 @@ export default function DeliveryNotes() {
                         {format(new Date(note.scanned_at), 'yyyy-MM-dd HH:mm')}
                       </p>
                     </div>
-                    {getStatusBadge(note)}
+                    <div className="flex items-center gap-2">
+                      {getStatusBadge(note)}
+                      {isSuperAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={(e) => handleDeleteClick(e, note)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-2">
@@ -166,6 +249,30 @@ export default function DeliveryNotes() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Radera följesedel?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Är du säker på att du vill radera följesedel #{noteToDelete?.delivery_note_number}?
+              Detta kommer permanent radera följesedeln och alla dess artiklar.
+              <br /><br />
+              <strong className="text-destructive">Denna åtgärd kan inte ångras.</strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Radera
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
