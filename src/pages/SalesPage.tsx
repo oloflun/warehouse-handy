@@ -128,13 +128,16 @@ const SalesPage = () => {
 
       if (orderError) throw orderError;
 
+      // Update local state immediately for better UX
+      setOrders(prevOrders => prevOrders.filter(order => order.id !== orderToDelete.id));
+
       toast({
         title: "Raderad",
         description: `Order #${orderToDelete.order_number} har raderats`,
       });
 
-      // Refresh the list
-      fetchOrders();
+      // Refresh the list from server to ensure consistency
+      await fetchOrders();
     } catch (error) {
       console.error('Error deleting order:', error);
       toast({

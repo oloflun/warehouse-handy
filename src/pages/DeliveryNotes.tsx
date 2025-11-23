@@ -126,13 +126,16 @@ export default function DeliveryNotes() {
 
       if (noteError) throw noteError;
 
+      // Update local state immediately for better UX
+      setDeliveryNotes(prevNotes => prevNotes.filter(note => note.id !== noteToDelete.id));
+
       toast({
         title: "Raderad",
         description: `Följesedel #${noteToDelete.delivery_note_number} har raderats`,
       });
 
-      // Refresh the list
-      fetchDeliveryNotes();
+      // Refresh the list from server to ensure consistency
+      await fetchDeliveryNotes();
     } catch (error) {
       console.error('Error deleting delivery note:', error);
       toast({

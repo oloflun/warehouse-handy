@@ -175,14 +175,17 @@ const ArticlesPage = () => {
 
       if (productError) throw productError;
 
+      // Update local state immediately for better UX
+      setArticles(prevArticles => prevArticles.filter(article => article.id !== articleToDelete.id));
+
       const articleNumber = articleToDelete.barcode || articleToDelete.fdt_sellus_article_id || articleToDelete.name;
       toast({
         title: "Raderad",
         description: `Artikel ${articleNumber} har raderats`,
       });
 
-      // Refresh the list
-      fetchArticles();
+      // Refresh the list from server to ensure consistency
+      await fetchArticles();
     } catch (error) {
       console.error('Error deleting article:', error);
       toast({
