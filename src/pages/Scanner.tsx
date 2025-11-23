@@ -41,7 +41,7 @@ const Scanner = () => {
 
   // AI Provider and Model Selection
   const [aiProvider, setAiProvider] = useState<"gemini" | "openai">("gemini");
-  const [aiModel, setAiModel] = useState<string>("gemini-1.5-flash");
+  const [aiModel, setAiModel] = useState<string>("gemini-1.5-flash-latest");
   const [lastScanStats, setLastScanStats] = useState<{
     provider: string;
     model: string;
@@ -65,7 +65,7 @@ const Scanner = () => {
   // Update model when provider changes
   useEffect(() => {
     if (aiProvider === "gemini") {
-      setAiModel("gemini-1.5-flash");
+      setAiModel("gemini-1.5-flash-latest");
     } else if (aiProvider === "openai") {
       setAiModel("gpt-4o-mini");
     }
