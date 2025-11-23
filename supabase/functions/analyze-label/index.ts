@@ -12,22 +12,22 @@ serve(async (req) => {
   }
 
   const startTime = Date.now();
-  
+
   try {
     const { image } = await req.json();
-    
+
     if (!image) {
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: 'No image provided',
           article_numbers: [],
           product_names: [],
           confidence: 'low',
           warnings: ['No image provided']
         }),
-        { 
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
@@ -35,16 +35,16 @@ serve(async (req) => {
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
     if (!GEMINI_API_KEY) {
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: 'GEMINI_API_KEY is not configured. Please add it to Supabase Edge Function environment variables.',
           article_numbers: [],
           product_names: [],
           confidence: 'low',
           warnings: ['GEMINI_API_KEY not configured']
         }),
-        { 
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
@@ -101,7 +101,7 @@ Return ONLY valid JSON in this exact format (no markdown, no explanations):
 
     // Format for Google Gemini API
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: {
@@ -134,15 +134,17 @@ Return ONLY valid JSON in this exact format (no markdown, no explanations):
     if (!response.ok) {
       const errorText = await response.text();
       console.error("Gemini API error:", response.status, errorText);
-      
+
       // Special handling for rate limit errors (429)
       let errorMessage = `Gemini API error: ${response.status}`;
       let userFriendlyMessage = errorText;
-      
+      let status = 502; // Default to Bad Gateway for upstream errors
+
       if (response.status === 429) {
+        status = 429;
         errorMessage = 'Gemini API rate limit exceeded';
         userFriendlyMessage = 'API-gränsen har nåtts. Vänta några minuter eller kontakta administratören för att öka kvoten. Tips: Använd manuell artikelnummerinmatning tills vidare.';
-        
+
         // Try to extract retry time if available
         try {
           const errorData = JSON.parse(errorText);
@@ -157,9 +159,9 @@ Return ONLY valid JSON in this exact format (no markdown, no explanations):
           // Ignore parse errors
         }
       }
-      
+
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: errorMessage,
           details: userFriendlyMessage,
           article_numbers: [],
@@ -167,47 +169,47 @@ Return ONLY valid JSON in this exact format (no markdown, no explanations):
           confidence: 'low',
           warnings: [errorMessage]
         }),
-        { 
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        {
+          status: status,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
 
     const data = await response.json();
     console.log('Raw Gemini API response:', JSON.stringify(data, null, 2));
-    
+
     const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
     const finishReason = data.candidates?.[0]?.finishReason;
-    
+
     // Check for safety blocks or other issues
     if (finishReason && finishReason !== 'STOP') {
       console.error('Gemini finished with reason:', finishReason);
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: `Gemini API blocked or failed: ${finishReason}`,
-          details: finishReason === 'SAFETY' 
+          details: finishReason === 'SAFETY'
             ? 'Response blocked by safety filters. Try a clearer image or different angle.'
             : finishReason === 'MAX_TOKENS'
-            ? 'Response too long. Try scanning a smaller area.'
-            : `Finish reason: ${finishReason}`,
+              ? 'Response too long. Try scanning a smaller area.'
+              : `Finish reason: ${finishReason}`,
           article_numbers: [],
           product_names: [],
           confidence: 'low',
           warnings: [`API finish reason: ${finishReason}`],
           rawResponse: data
         }),
-        { 
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        {
+          status: 502, // Upstream issue
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
-    
+
     if (!content) {
       console.error('No content in Gemini response, full response:', data);
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: 'No response content from Gemini API',
           details: 'API returned successfully but no text content was found',
           article_numbers: [],
@@ -216,13 +218,13 @@ Return ONLY valid JSON in this exact format (no markdown, no explanations):
           warnings: ['No response content from Gemini API'],
           rawResponse: data
         }),
-        { 
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        {
+          status: 502, // Upstream issue
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
-    
+
     console.log('Gemini text response:', content);
 
     // Parse the JSON response
@@ -236,7 +238,7 @@ Return ONLY valid JSON in this exact format (no markdown, no explanations):
       console.error('Failed to parse Gemini response:', content);
       console.error('Parse error:', parseError);
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: 'Failed to parse Gemini response as JSON',
           details: content,
           article_numbers: [],
@@ -244,13 +246,13 @@ Return ONLY valid JSON in this exact format (no markdown, no explanations):
           confidence: 'low',
           warnings: ['Failed to parse Gemini response']
         }),
-        { 
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        {
+          status: 502, // Upstream returned invalid format
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
-    
+
     const elapsed = Date.now() - startTime;
     console.log(`✅ Label analyzed in ${elapsed}ms`);
     console.log("Extracted data:", result);
@@ -262,18 +264,18 @@ Return ONLY valid JSON in this exact format (no markdown, no explanations):
   } catch (error) {
     const elapsed = Date.now() - startTime;
     console.error(`❌ Error in analyze-label after ${elapsed}ms:`, error);
-    
+
     // Always return 200 with error details in body
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: error instanceof Error ? error.message : "Unknown error",
         article_numbers: [],
         product_names: [],
         confidence: "low",
         warnings: ["Analysis failed: " + (error instanceof Error ? error.message : "Unknown error")]
-      }), 
+      }),
       {
-        status: 200,
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );

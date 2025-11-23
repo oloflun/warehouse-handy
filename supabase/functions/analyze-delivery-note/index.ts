@@ -24,7 +24,7 @@ serve(async (req) => {
           items: []
         }),
         { 
-          status: 200,
+          status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
@@ -40,7 +40,7 @@ serve(async (req) => {
           items: []
         }),
         { 
-          status: 200,
+          status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
@@ -95,7 +95,7 @@ ACCURACY IS CRITICAL. If unclear, return null for that field.`;
 
     // Format for Google Gemini API
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: {
@@ -132,8 +132,10 @@ ACCURACY IS CRITICAL. If unclear, return null for that field.`;
       // Special handling for rate limit errors (429)
       let errorMessage = `Gemini API error: ${response.status}`;
       let userFriendlyMessage = errorText;
+      let status = 502; // Default to Bad Gateway for upstream errors
       
       if (response.status === 429) {
+        status = 429;
         errorMessage = 'Gemini API rate limit exceeded';
         userFriendlyMessage = 'API-gränsen har nåtts. Vänta några minuter eller kontakta administratören för att öka kvoten. Tips: Använd manuell artikelnummerinmatning tills vidare.';
         
@@ -161,7 +163,7 @@ ACCURACY IS CRITICAL. If unclear, return null for that field.`;
           items: []
         }),
         { 
-          status: 200,
+          status: status,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
@@ -190,7 +192,7 @@ ACCURACY IS CRITICAL. If unclear, return null for that field.`;
           rawResponse: data
         }),
         { 
-          status: 200,
+          status: 502, // Upstream issue
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
@@ -208,7 +210,7 @@ ACCURACY IS CRITICAL. If unclear, return null for that field.`;
           rawResponse: data
         }),
         { 
-          status: 200,
+          status: 502, // Upstream issue
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
@@ -235,7 +237,7 @@ ACCURACY IS CRITICAL. If unclear, return null for that field.`;
           items: []
         }),
         { 
-          status: 200,
+          status: 502, // Upstream returned invalid format
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
@@ -252,7 +254,7 @@ ACCURACY IS CRITICAL. If unclear, return null for that field.`;
           items: []
         }),
         { 
-          status: 200,
+          status: 502, // Upstream returned invalid structure
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
@@ -272,7 +274,7 @@ ACCURACY IS CRITICAL. If unclear, return null for that field.`;
     const elapsed = Date.now() - startTime;
     console.error(`❌ Error in analyze-delivery-note after ${elapsed}ms:`, error);
     
-    // Always return 200 with error details in body
+    // Return 500 for internal errors
     return new Response(
       JSON.stringify({ 
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -282,7 +284,7 @@ ACCURACY IS CRITICAL. If unclear, return null for that field.`;
         items: []
       }),
       { 
-        status: 200,
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
