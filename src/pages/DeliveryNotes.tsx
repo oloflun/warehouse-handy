@@ -21,6 +21,7 @@ import {
 interface DeliveryNote {
   id: string;
   delivery_note_number: string;
+  supplier_name: string | null;
   scanned_at: string;
   status: string;
   cargo_marking: string | null;
@@ -89,10 +90,10 @@ export default function DeliveryNotes() {
 
       setDeliveryNotes(notesWithCounts);
     } catch (error) {
-      console.error('Error fetching delivery notes:', error);
+      console.error('Error fetching delivery notes:', error instanceof Error ? error.message : JSON.stringify(error));
       toast({
         title: "Fel",
-        description: "Kunde inte hämta följesedlar",
+        description: error instanceof Error ? error.message : "Kunde inte hämta följesedlar",
         variant: "destructive",
       });
     } finally {
@@ -202,7 +203,7 @@ export default function DeliveryNotes() {
             {deliveryNotes.map((note) => (
               <Card
                 key={note.id}
-                className="cursor-pointer hover:bg-accent transition-colors"
+                className="cursor-pointer hover:shadow-lg transition-shadow"
                 onClick={() => navigate(`/delivery-notes/${note.id}`)}
               >
                 <CardHeader className="pb-3">

@@ -12,6 +12,7 @@ import { DeliveryNoteItemCard } from "@/components/DeliveryNoteItemCard";
 interface DeliveryNote {
   id: string;
   delivery_note_number: string;
+  supplier_name: string | null;
   scanned_at: string;
   status: string;
   cargo_marking: string | null;
@@ -64,10 +65,10 @@ export default function DeliveryNoteDetail() {
       if (itemsError) throw itemsError;
       setItems(itemsData || []);
     } catch (error) {
-      console.error('Error fetching delivery note:', error);
+      console.error('Error fetching delivery note:', error instanceof Error ? error.message : JSON.stringify(error));
       toast({
         title: "Fel",
-        description: "Kunde inte hämta följesedel",
+        description: error instanceof Error ? error.message : "Kunde inte hämta följesedel",
         variant: "destructive",
       });
     } finally {
@@ -242,9 +243,33 @@ export default function DeliveryNoteDetail() {
     }
   };
 
-  const handleViewOrder = (orderNumber: string) => {
-    // Find the order and navigate to it
-    navigate(`/integrations/sales?search=${orderNumber}`);
+  const handleViewOrder = async (orderNumber: string) => {
+    try {
+      const { data: order, error } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('order_number', orderNumber)
+        .single();
+
+      if (error) throw error;
+      if (!order) {
+        toast({
+          title: "Ordning hittades inte",
+          description: `Kunna inte hitta order ${orderNumber}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      navigate(`/sales/${order.id}`);
+    } catch (error) {
+      console.error('Error navigating to order:', error);
+      toast({
+        title: "Fel",
+        description: "Kunde inte öppna order",
+        variant: "destructive",
+      });
+    }
   };
 
   if (loading) {
@@ -287,12 +312,17 @@ export default function DeliveryNoteDetail() {
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold font-mono">
-                #{deliveryNote.delivery_note_number}
+              <h1 className="text-2xl font-bold">
+                {deliveryNote.supplier_name || 'Okänd leverantör'}
               </h1>
-              <p className="text-sm text-muted-foreground">
-                {format(new Date(deliveryNote.scanned_at), 'yyyy-MM-dd HH:mm')}
-              </p>
+              <div className="flex items-center gap-3 mt-1">
+                <p className="text-sm text-muted-foreground font-mono">
+                  #{deliveryNote.delivery_note_number}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {format(new Date(deliveryNote.scanned_at), 'yyyy-MM-dd HH:mm')}
+                </p>
+              </div>
             </div>
           </div>
           <Button

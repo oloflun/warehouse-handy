@@ -71,12 +71,45 @@ export const DeliveryNoteItemCard = ({
 
         <div className="flex-1 space-y-2">
           <div className="flex items-start justify-between gap-2">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Package className="h-4 w-4 text-muted-foreground" />
-                <span className="font-mono text-lg font-bold">
-                  {item.article_number || "OKÄNT ARTIKELNR"}
-                </span>
+            <div className="space-y-1 flex-1">
+              {/* Order Numbers - Bold at top */}
+              {item.order_number && (
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <div className="flex flex-wrap gap-1">
+                    {item.order_number
+                      .split(/[,\s]+/)  // Split by comma or whitespace
+                      .filter(num => num.trim().length > 0)  // Remove empty values
+                      .map((orderNum, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => onViewOrder?.(orderNum.trim())}
+                          className="font-mono text-lg font-bold text-primary hover:underline"
+                        >
+                          {orderNum.trim()}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Article Number and Description */}
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-mono font-bold text-sm">
+                    {item.article_number || "OKÄNT ARTIKELNR"}
+                  </span>
+                </div>
+                {item.description && (
+                  <p className="text-sm text-muted-foreground line-clamp-2 ml-0">
+                    {item.description}
+                  </p>
+                )}
+              </div>
+
+              {/* Alerts */}
+              <div className="flex flex-wrap gap-2 mt-2">
                 {quantityDiffers && (
                   <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-400 dark:bg-yellow-900 dark:text-yellow-100">
                     <AlertTriangle className="h-3 w-3 mr-1" />
@@ -90,27 +123,6 @@ export const DeliveryNoteItemCard = ({
                   </Badge>
                 )}
               </div>
-
-              {item.order_number && (
-                <div className="flex items-center gap-2">
-                  <FileText className="h-3 w-3 text-muted-foreground" />
-                  <button
-                    onClick={() => onViewOrder?.(item.order_number!)}
-                    className="text-sm text-primary hover:underline"
-                  >
-                    Order: {item.order_number}
-                  </button>
-                </div>
-              )}
-
-              {cargoMarking && (
-                <div className="flex items-center gap-2">
-                  <Tag className="h-3 w-3 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">
-                    Godsmärke: {cargoMarking}
-                  </span>
-                </div>
-              )}
             </div>
 
             <div className="flex flex-col items-end gap-2">
@@ -162,11 +174,6 @@ export const DeliveryNoteItemCard = ({
             </div>
           </div>
 
-          {item.description && (
-            <p className="text-sm text-muted-foreground line-clamp-2">
-              {item.description}
-            </p>
-          )}
         </div>
       </div>
     </Card>

@@ -92,6 +92,7 @@ export default function DeliveryNoteScan() {
 
       setDeliveryNoteNumber(noteData.delivery_note_number);
       setCargoMarking(noteData.cargo_marking || "");
+      // Note: supplier_name will be saved when the note is created via analyze
 
       const { data: itemsData, error: itemsError } = await supabase
         .from('delivery_note_items')
@@ -102,10 +103,10 @@ export default function DeliveryNoteScan() {
       if (itemsError) throw itemsError;
       setItems(itemsData || []);
     } catch (error) {
-      console.error('Error fetching delivery note:', error);
+      console.error('Error fetching delivery note:', error instanceof Error ? error.message : JSON.stringify(error));
       toast({
         title: "Fel",
-        description: "Kunde inte hämta följesedel",
+        description: error instanceof Error ? error.message : "Kunde inte hämta följesedel",
         variant: "destructive",
       });
     }
@@ -337,6 +338,7 @@ export default function DeliveryNoteScan() {
         .from('delivery_notes')
         .insert({
           delivery_note_number: analysisData.deliveryNoteNumber,
+          supplier_name: analysisData.supplierName || null,
           cargo_marking: analysisData.cargoMarking,
           scanned_by: user.user?.id,
           status: 'pending'
