@@ -8,7 +8,7 @@ import { useState } from "react";
 
 interface DeliveryNoteItem {
   id: string;
-  article_number: string;
+  article_number: string | null;
   order_number: string | null;
   description: string | null;
   quantity_expected: number;
@@ -26,12 +26,12 @@ interface DeliveryNoteItemCardProps {
   onViewOrder?: (orderNumber: string) => void;
 }
 
-export const DeliveryNoteItemCard = ({ 
-  item, 
+export const DeliveryNoteItemCard = ({
+  item,
   cargoMarking,
   onCheck,
   onQuantityChange,
-  onViewOrder 
+  onViewOrder
 }: DeliveryNoteItemCardProps) => {
   const [isEditingQuantity, setIsEditingQuantity] = useState(false);
   const [editedQuantity, setEditedQuantity] = useState(item.quantity_expected);
@@ -51,16 +51,15 @@ export const DeliveryNoteItemCard = ({
   const quantityDiffers = item.quantity_checked !== item.quantity_expected && item.is_checked;
 
   return (
-    <Card 
-      className={`p-4 transition-colors ${
-        item.is_checked 
+    <Card
+      className={`p-4 transition-colors ${item.is_checked
           ? quantityDiffers
             ? 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-400 dark:border-yellow-700 border-2'
             : 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800'
           : item.quantity_modified
-          ? 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800'
-          : 'bg-card'
-      }`}
+            ? 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800'
+            : 'bg-card'
+        }`}
     >
       <div className="flex items-start gap-3">
         <Checkbox
@@ -69,14 +68,14 @@ export const DeliveryNoteItemCard = ({
           className="mt-1 h-6 w-6"
           disabled={item.is_checked}
         />
-        
+
         <div className="flex-1 space-y-2">
           <div className="flex items-start justify-between gap-2">
             <div className="space-y-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <Package className="h-4 w-4 text-muted-foreground" />
                 <span className="font-mono text-lg font-bold">
-                  {item.article_number}
+                  {item.article_number || "OKÄNT ARTIKELNR"}
                 </span>
                 {quantityDiffers && (
                   <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-400 dark:bg-yellow-900 dark:text-yellow-100">
@@ -91,7 +90,7 @@ export const DeliveryNoteItemCard = ({
                   </Badge>
                 )}
               </div>
-              
+
               {item.order_number && (
                 <div className="flex items-center gap-2">
                   <FileText className="h-3 w-3 text-muted-foreground" />
@@ -103,7 +102,7 @@ export const DeliveryNoteItemCard = ({
                   </button>
                 </div>
               )}
-              
+
               {cargoMarking && (
                 <div className="flex items-center gap-2">
                   <Tag className="h-3 w-3 text-muted-foreground" />
@@ -113,7 +112,7 @@ export const DeliveryNoteItemCard = ({
                 </div>
               )}
             </div>
-            
+
             <div className="flex flex-col items-end gap-2">
               {!isEditingQuantity ? (
                 <>
@@ -162,7 +161,7 @@ export const DeliveryNoteItemCard = ({
               )}
             </div>
           </div>
-          
+
           {item.description && (
             <p className="text-sm text-muted-foreground line-clamp-2">
               {item.description}
